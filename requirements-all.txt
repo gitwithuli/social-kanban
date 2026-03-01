@@ -1,0 +1,25 @@
+# Core (same as requirements.txt)
+flask>=3.0.0
+sqlalchemy>=2.0.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
+click>=8.1.0
+rich>=13.7.0
+requests>=2.31.0
+pillow>=10.0.0
+python-docx>=1.1.0
+APScheduler>=3.10.0
+PyMuPDF>=1.23.0
+pytest>=7.4.0
+
+# PostgreSQL support
+psycopg2-binary>=2.9.0
+
+# AI content generation
+anthropic>=0.18.0
+
+# Twitter/X integration
+tweepy>=4.14.0
+
+# Production server
+gunicorn>=21.0.0

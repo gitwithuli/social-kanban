@@ -1,0 +1,35 @@
+brand:
+  name: "Social Kanban"
+  handle: "socialkanban"
+  tagline: "Plan. Create. Post."
+  domain: ""
+  hashtags: "#SocialKanban #ContentCreator"
+
+anthropic:
+  model: claude-sonnet-4-20250514
+
+platforms:
+  twitter:
+    enabled: true
+    handle: ""
+    post_times: ["09:00", "17:00"]
+    auto_post: false
+  instagram:
+    enabled: false
+    handle: ""
+    post_times: ["10:00", "18:00"]
+    auto_post: false
+
+content:
+  daily_quote_time: "09:00"
+  min_quote_quality: 7.0
+  max_reuse_count: 2
+  days_before_reuse: 45
+  require_approval: true
+  max_quote_length: 280
+
+database:
+  url: "sqlite:///data/social_kanban.db"
+
+workflow:
+  mode: "local_approval"
