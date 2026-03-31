@@ -3824,6 +3824,8 @@ DASHBOARD_TEMPLATE = """
             createPostCard,
             syncBoardStats,
             updateCardPresentation,
+            toDateTimeLocalValue,
+            applyPostCardData,
         });
     })();
 
@@ -4834,12 +4836,12 @@ DASHBOARD_TEMPLATE = """
             return;
         }
 
-        closeModal();
+        window.closeModal();
         openDraftModal();
         draftEditPostId = postId;
         draftEditPlatform = editBtn.dataset.platform || 'twitter';
         document.getElementById('draftContent').value = editBtn.dataset.content || '';
-        document.getElementById('draftSchedule').value = toDateTimeLocalValue(editBtn.dataset.scheduledAt || '');
+        document.getElementById('draftSchedule').value = window.toDateTimeLocalValue(editBtn.dataset.scheduledAt || '');
         document.getElementById('draftImageUrl').value = editBtn.dataset.imageUrl || '';
         document.querySelectorAll('input[name="draftPlatform"]').forEach((input) => {
             input.checked = input.value === draftEditPlatform;
@@ -4869,7 +4871,7 @@ DASHBOARD_TEMPLATE = """
             const card = document.querySelector(`.card[data-id="${postId}"]`);
             if (card) card.remove();
             window.syncBoardStats();
-            closeModal();
+            window.closeModal();
             window.showToast('Draft removed');
         } catch (err) {
             window.showToast(err.message || 'Failed to remove draft', true);
@@ -4969,7 +4971,7 @@ DASHBOARD_TEMPLATE = """
                     throw new Error(data.error || 'Failed to update draft');
                 }
                 const card = document.querySelector(`.card[data-id="${draftEditPostId}"]`);
-                if (card) applyPostCardData(card, data.post);
+                if (card) window.applyPostCardData(card, data.post);
                 window.syncBoardStats();
                 closeDraftModal();
                 window.showToast('Draft updated');
