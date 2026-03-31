@@ -19,7 +19,7 @@ class InstagramClient:
 
     def is_configured(self):
         """Check if Instagram credentials are configured."""
-        return bool(self.page_token and self.instagram_account_id)
+        return bool(self.page_token and (self.instagram_account_id or self.page_id))
 
     def _get_instagram_account_id(self):
         """Fetch Instagram Business Account ID from Facebook Page."""

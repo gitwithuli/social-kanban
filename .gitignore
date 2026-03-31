@@ -34,6 +34,10 @@ wheels/
 # Database
 *.db
 data/*.db
+data/settings.enc
+data/settings.key
+data/flask-secret.txt
+data/agent-token.txt
 
 # OS
 .DS_Store

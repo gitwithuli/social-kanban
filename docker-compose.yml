@@ -8,8 +8,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./config:/app/config
-    env_file:
-      - .env
     environment:
       - PORT=5001
     restart: unless-stopped

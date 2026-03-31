@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 import json
 
@@ -102,7 +102,7 @@ class TwitterClient:
         if self.dry_run:
             self.console.print("[yellow]DRY RUN - Tweet would be posted:[/yellow]")
             self.console.print(f"[dim]Content: {post.content}[/dim]")
-            self.console.print(f"[dim]Timestamp: {datetime.now(UTC).isoformat()}[/dim]")
+            self.console.print(f"[dim]Timestamp: {datetime.now(timezone.utc).isoformat()}[/dim]")
 
             return {
                 "status": "dry_run",
@@ -122,7 +122,7 @@ class TwitterClient:
             result = self.client.create_tweet(text=post.content)
 
             post.status = PostStatus.POSTED.value
-            post.posted_time = datetime.now(UTC)
+            post.posted_time = datetime.now(timezone.utc)
             post.post_id = str(result.data['id'])
             self.session.commit()
 

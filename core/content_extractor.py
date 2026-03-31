@@ -54,7 +54,7 @@ class ContentExtractor:
     def __init__(self, api_key: Optional[str] = None, model: str = "llama-3.3-70b-versatile"):
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY not set. Set it in your .env file to enable document extraction.")
+            raise ValueError("GROQ_API_KEY not set. Save it in Settings to enable document extraction.")
         self.model = model
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
 

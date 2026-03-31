@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Seed database with sample public domain quotes for dashboard preview."""
 
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from core.models import Quote, Post, PostStatus, init_db, get_session
 from core.config import get_config
 
@@ -238,7 +238,7 @@ def seed_quotes():
             topic=quote_data["topic"],
             quality_score=quote_data["quality_score"],
             approved=True,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         session.add(quote)
 
@@ -259,8 +259,8 @@ def seed_posts():
 
     quotes = planner.get_shuffled_quotes(14, min_score=7.0)
 
-    base_time = datetime.now(UTC).replace(hour=9, minute=0, second=0, microsecond=0)
-    if base_time < datetime.now(UTC):
+    base_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+    if base_time < datetime.now(timezone.utc):
         base_time += timedelta(days=1)
 
     for i, quote in enumerate(quotes):
@@ -278,7 +278,7 @@ def seed_posts():
             content=content,
             scheduled_time=scheduled,
             status=PostStatus.APPROVED.value if i < 3 else PostStatus.PENDING.value,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         session.add(post)
 

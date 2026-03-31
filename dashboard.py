@@ -1,19 +1,57 @@
 #!/usr/bin/env python3
 """Kanban dashboard with smooth drag-and-drop."""
+from __future__ import annotations
 
 import os
 import json
 import secrets
 import logging
 from functools import wraps
+from typing import Any
 from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from core.models import Quote, Post, PostStatus, init_db, get_session
 from core.config import get_config as _get_brand_config
+from core.settings_store import (
+    PROVIDER_DEFINITIONS,
+    SETTINGS_STORE,
+    SOCIAL_POST_PROVIDERS,
+    bootstrap_runtime_environment,
+    temporary_env,
+)
+
+RUNTIME_SECRETS = bootstrap_runtime_environment()
+
+
+def _normalize_app_base_path(value: str | None) -> str:
+    if not value:
+        return ''
+    trimmed = value.strip()
+    if not trimmed or trimmed == '/':
+        return ''
+    if not trimmed.startswith('/'):
+        trimmed = '/' + trimmed
+    return trimmed.rstrip('/')
+
+
+APP_BASE_PATH = _normalize_app_base_path(os.getenv('APPLICATION_ROOT'))
+
+
+class PrefixMiddleware:
+    def __init__(self, app, prefix: str):
+        self.app = app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        path_info = environ.get('PATH_INFO', '')
+        if path_info.startswith(self.prefix):
+            environ['SCRIPT_NAME'] = self.prefix
+            environ['PATH_INFO'] = path_info[len(self.prefix):] or '/'
+        return self.app(environ, start_response)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +68,9 @@ def _build_profile():
 PROFILE_CONFIG = _build_profile()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
+app.secret_key = os.getenv('FLASK_SECRET_KEY', RUNTIME_SECRETS['flask_secret_key'])
+if APP_BASE_PATH:
+    app.wsgi_app = PrefixMiddleware(app.wsgi_app, APP_BASE_PATH)
 
 # Security configuration
 app.config.update(
@@ -40,6 +80,212 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=3600,  # 1 hour
     MAX_CONTENT_LENGTH=50 * 1024 * 1024  # 50MB max upload
 )
+
+
+def _full_path(path: str) -> str:
+    if not path.startswith('/'):
+        path = '/' + path
+    return f'{APP_BASE_PATH}{path}' if APP_BASE_PATH else path
+
+
+def _template_shell() -> str:
+    return """
+{% if app_base_path %}
+<script>
+window.SK_APP_BASE_PATH = {{ app_base_path | tojson }};
+const __skOriginalFetch = window.fetch.bind(window);
+window.fetch = function(resource, init) {
+    if (typeof resource === 'string' && resource.startsWith('/')) {
+        resource = window.SK_APP_BASE_PATH + resource;
+    }
+    return __skOriginalFetch(resource, init);
+};
+</script>
+{% else %}
+<script>window.SK_APP_BASE_PATH = '';</script>
+{% endif %}
+"""
+
+
+def _dashboard_shell() -> str:
+    return """
+<style>
+    .sk-settings-fab {
+        position: fixed;
+        right: 1.5rem;
+        bottom: 1.5rem;
+        z-index: 999;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.75rem 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(88, 166, 255, 0.24);
+        background: rgba(6, 12, 18, 0.88);
+        backdrop-filter: blur(14px);
+        color: #e6edf3;
+        text-decoration: none;
+        font-weight: 600;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .sk-settings-fab:hover {
+        background: rgba(16, 24, 33, 0.96);
+        border-color: rgba(88, 166, 255, 0.45);
+    }
+</style>
+""" + _template_shell() + """
+<a class="sk-settings-fab" href="{{ app_base_path }}/settings">Settings</a>
+"""
+
+
+def _dashboard_template() -> str:
+    return DASHBOARD_TEMPLATE.replace('</body>', _dashboard_shell() + '\n</body>')
+
+
+def _render_provider_payload() -> dict[str, dict[str, Any]]:
+    return SETTINGS_STORE.get_provider_values()
+
+
+def _needs_onboarding() -> bool:
+    return not SETTINGS_STORE.has_any_credentials()
+
+
+def _is_session_authorized() -> bool:
+    password = os.getenv('DASHBOARD_PASSWORD')
+    return not password or bool(session.get('authenticated'))
+
+
+def _is_agent_request() -> bool:
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return False
+    token = os.getenv('SOCIAL_KANBAN_AGENT_TOKEN', '')
+    return bool(token) and secrets.compare_digest(auth[7:], token)
+
+
+def login_or_agent_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if _is_agent_request() or _is_session_authorized():
+            return f(*args, **kwargs)
+        return jsonify({'error': 'Unauthorized'}), 401
+    return decorated
+
+
+def _parse_scheduled_at(value: Any) -> datetime | None:
+    if value is None or value == '':
+        return None
+    if not isinstance(value, str):
+        raise ValueError('scheduled_at must be an ISO-8601 string')
+    try:
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError as exc:
+        raise ValueError('scheduled_at must be a valid ISO-8601 timestamp') from exc
+
+
+def _normalize_platforms(value: Any) -> list[str]:
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError('platform is required')
+        if normalized == 'all':
+            return list(SOCIAL_POST_PROVIDERS)
+        candidates = [normalized]
+    elif isinstance(value, list):
+        candidates = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise ValueError('platform must be a string or list of strings')
+            trimmed = entry.strip().lower()
+            if trimmed:
+                candidates.append(trimmed)
+    else:
+        raise ValueError('platform must be a string or list of strings')
+
+    if not candidates:
+        raise ValueError('platform is required')
+
+    invalid = [platform for platform in candidates if platform not in SOCIAL_POST_PROVIDERS]
+    if invalid:
+        raise ValueError(f'Unsupported platforms: {", ".join(sorted(set(invalid)))}')
+
+    return list(dict.fromkeys(candidates))
+
+
+def _provider_test_overrides(provider: str, values: dict[str, Any]) -> dict[str, str | None]:
+    definition = PROVIDER_DEFINITIONS[provider]
+    overrides: dict[str, str | None] = {}
+    for field in definition['fields']:
+        raw_value = values.get(field['name']) if isinstance(values, dict) else None
+        if raw_value is None:
+            raw_value = os.getenv(field['name'])
+        overrides[field['name']] = None if raw_value is None else str(raw_value)
+    return overrides
+
+
+def _test_provider_connection(provider: str, values: dict[str, Any]) -> dict[str, Any]:
+    overrides = _provider_test_overrides(provider, values)
+    with temporary_env(overrides):
+        if provider == 'anthropic':
+            api_key = os.getenv('ANTHROPIC_API_KEY', '').strip()
+            if not api_key:
+                return {'configured': False, 'error': 'Anthropic API key not set'}
+            import requests
+            response = requests.get(
+                'https://api.anthropic.com/v1/models',
+                headers={
+                    'x-api-key': api_key,
+                    'anthropic-version': '2023-06-01',
+                },
+                timeout=30,
+            )
+            try:
+                data = response.json()
+            except ValueError:
+                data = {}
+            if response.status_code >= 400:
+                return {'configured': False, 'error': data.get('error', {}).get('message') or response.text or 'Anthropic authentication failed'}
+            return {'configured': True, 'status': 'ok'}
+
+        if provider == 'groq':
+            api_key = os.getenv('GROQ_API_KEY', '').strip()
+            if not api_key:
+                return {'configured': False, 'error': 'Groq API key not set'}
+            import requests
+            response = requests.get(
+                'https://api.groq.com/openai/v1/models',
+                headers={'Authorization': f'Bearer {api_key}'},
+                timeout=30,
+            )
+            try:
+                data = response.json()
+            except ValueError:
+                data = {}
+            if response.status_code >= 400:
+                return {'configured': False, 'error': data.get('error', {}).get('message') or response.text or 'Groq authentication failed'}
+            return {'configured': True, 'status': 'ok'}
+
+        if provider == 'twitter':
+            from integrations.twitter_client import TwitterClient
+            return TwitterClient(dry_run=False).verify_credentials()
+
+        if provider == 'facebook':
+            from integrations.facebook_client import FacebookClient
+            return FacebookClient().verify_credentials()
+
+        if provider == 'instagram':
+            from integrations.instagram_client import InstagramClient
+            return InstagramClient().verify_credentials()
+
+        if provider == 'cloudinary':
+            from integrations.cloudinary_client import CloudinaryClient
+            return CloudinaryClient().verify_credentials()
+
+        if provider == 'linkedin':
+            from integrations.linkedin_client import LinkedInClient
+            return LinkedInClient().verify_credentials()
+
+    return {'configured': False, 'error': 'Unknown provider'}
 
 def login_required(f):
     """Require authentication if DASHBOARD_PASSWORD is set."""
@@ -159,6 +405,481 @@ LOGIN_TEMPLATE = """
             <button type="submit">Sign in</button>
         </form>
     </div>
+</body>
+</html>
+"""
+
+ONBOARDING_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Your Socials — Social Kanban</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Outfit', sans-serif;
+            background:
+                radial-gradient(circle at top, rgba(88, 166, 255, 0.18), transparent 30%),
+                linear-gradient(180deg, #07090d 0%, #0b0f14 100%);
+            color: #e6edf3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .shell {
+            width: min(960px, 100%);
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 1.5rem;
+        }
+        .card {
+            background: rgba(9, 14, 20, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+        }
+        h1 {
+            margin: 0 0 0.75rem;
+            font-size: clamp(2rem, 4vw, 3rem);
+            line-height: 1.05;
+        }
+        p.lead {
+            margin: 0 0 1.25rem;
+            color: #9fb0c0;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+        .cta-row {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1.25rem;
+        }
+        .btn {
+            border: none;
+            border-radius: 999px;
+            padding: 0.85rem 1.25rem;
+            font: inherit;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #58a6ff, #7ee787);
+            color: #07111c;
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            color: #dbe8f5;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .providers {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .provider {
+            padding: 0.9rem 1rem;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .provider strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .provider span {
+            color: #8fa0b2;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+        .eyebrow {
+            display: inline-block;
+            margin-bottom: 0.8rem;
+            padding: 0.35rem 0.6rem;
+            border-radius: 999px;
+            background: rgba(88, 166, 255, 0.12);
+            color: #9dcbff;
+            letter-spacing: 0.12em;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+        }
+        @media (max-width: 780px) {
+            .shell { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="card">
+            <span class="eyebrow">First Run</span>
+            <h1>Connect your socials before you start filling the board.</h1>
+            <p class="lead">
+                Social Kanban stays lightweight until you add the accounts and AI keys you actually want.
+                No `.env` edits, no manual Docker steps, and no fake starter data.
+            </p>
+            <div class="cta-row">
+                <a class="btn btn-primary" href="{{ app_base_path }}/settings">Open Settings</a>
+                <a class="btn btn-secondary" href="{{ app_base_path }}/settings#agent-hook">Configure Agent Hook</a>
+            </div>
+        </section>
+        <aside class="card">
+            <span class="eyebrow">Supported</span>
+            <div class="providers">
+                {% for provider in providers.values() %}
+                <div class="provider">
+                    <strong>{{ provider.label }}</strong>
+                    <span>{{ provider.description }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </aside>
+    </div>
+</body>
+</html>
+"""
+
+SETTINGS_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — Social Kanban</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background: #07090d;
+            color: #e6edf3;
+        }
+        .page {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            padding: 2rem 1.25rem 4rem;
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .topbar h1 {
+            margin: 0 0 0.5rem;
+            font-size: clamp(2rem, 4vw, 2.8rem);
+        }
+        .topbar p {
+            margin: 0;
+            color: #8ea0b3;
+            line-height: 1.6;
+        }
+        .nav {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .nav a, .nav button {
+            text-decoration: none;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.03);
+            color: #dbe8f5;
+            padding: 0.75rem 1rem;
+            border-radius: 999px;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .notice {
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.1rem;
+            border-radius: 16px;
+            border: 1px solid rgba(126, 231, 135, 0.22);
+            background: rgba(126, 231, 135, 0.08);
+            color: #c7f9cf;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        .provider-card, .meta-card {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 22px;
+            padding: 1.25rem;
+        }
+        .provider-card h2, .meta-card h2 {
+            margin: 0 0 0.4rem;
+            font-size: 1.1rem;
+        }
+        .provider-card p, .meta-card p {
+            margin: 0 0 0.9rem;
+            color: #8b949e;
+            line-height: 1.5;
+        }
+        .provider-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-bottom: 1rem;
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: rgba(88, 166, 255, 0.12);
+            color: #9dcbff;
+        }
+        .provider-status.ready {
+            background: rgba(126, 231, 135, 0.12);
+            color: #8bf1a0;
+        }
+        .field {
+            display: grid;
+            gap: 0.35rem;
+            margin-bottom: 0.8rem;
+        }
+        .field span {
+            font-size: 0.85rem;
+            color: #b7c4d1;
+        }
+        .field input {
+            width: 100%;
+            padding: 0.8rem 0.95rem;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            background: #11161d;
+            color: #e6edf3;
+            font: inherit;
+        }
+        .provider-actions {
+            display: flex;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .provider-actions button,
+        .save-bar button {
+            border: none;
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .provider-actions .primary,
+        .save-bar .primary {
+            background: linear-gradient(135deg, #58a6ff, #7ee787);
+            color: #07111c;
+        }
+        .provider-actions .secondary,
+        .save-bar .secondary {
+            background: rgba(255,255,255,0.04);
+            color: #dbe8f5;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .provider-result {
+            min-height: 1.25rem;
+            margin-top: 0.9rem;
+            font-size: 0.85rem;
+            color: #8b949e;
+        }
+        .provider-result.ok {
+            color: #8bf1a0;
+        }
+        .provider-result.error {
+            color: #ff9b9b;
+        }
+        .save-bar {
+            position: sticky;
+            bottom: 1rem;
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.1rem;
+            border-radius: 18px;
+            background: rgba(8, 12, 18, 0.92);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .save-bar .message {
+            color: #9fb0c0;
+        }
+        code.token {
+            display: block;
+            margin-top: 0.7rem;
+            padding: 0.75rem 0.9rem;
+            border-radius: 12px;
+            background: #11161d;
+            border: 1px solid #30363d;
+            color: #8bf1a0;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        @media (max-width: 700px) {
+            .topbar, .save-bar { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="topbar">
+            <div>
+                <h1>Provider Settings</h1>
+                <p>Store your platform keys once, test them in place, and let the board run without manual `.env` editing.</p>
+            </div>
+            <div class="nav">
+                <a href="{{ app_base_path }}/">Back to Board</a>
+            </div>
+        </div>
+
+        {% if onboarding %}
+        <div class="notice">
+            This is the first-run setup. Add the providers you care about now, save, then go back to the board.
+        </div>
+        {% endif %}
+
+        <div class="grid">
+            {% for provider_key, provider in providers.items() %}
+            <section class="provider-card" data-provider="{{ provider_key }}">
+                <h2>{{ provider.label }}</h2>
+                <p>{{ provider.description }}</p>
+                <div class="provider-status {{ 'ready' if provider.configured else '' }}" id="status-{{ provider_key }}">
+                    {{ 'Configured' if provider.configured else 'Not configured' }}
+                    {% if provider.source == 'env' %} via env{% elif provider.source == 'settings' %} via UI{% endif %}
+                </div>
+                {% for field in provider.fields %}
+                <label class="field">
+                    <span>{{ field.label }}{% if field.required %} *{% endif %}</span>
+                    <input
+                        type="{{ 'password' if field.secret else 'text' }}"
+                        data-field="{{ field.name }}"
+                        placeholder="{{ field.placeholder }}"
+                        value="{{ provider.values[field.name] }}"
+                    >
+                </label>
+                {% endfor %}
+                <div class="provider-actions">
+                    <button class="secondary" type="button" onclick="testProvider('{{ provider_key }}')">Test Connection</button>
+                </div>
+                <div class="provider-result" id="result-{{ provider_key }}"></div>
+            </section>
+            {% endfor %}
+
+            <section class="meta-card" id="agent-hook">
+                <h2>Agent Hook</h2>
+                <p>
+                    Ekuri can push drafts directly into the kanban pipeline with
+                    <code>POST {{ app_base_path }}/api/posts</code>.
+                    Use the bearer token below from local or VPS automation.
+                </p>
+                <code class="token">{{ agent_token }}</code>
+                <p style="margin-top: 0.9rem;">
+                    Body shape:
+                    <code>{"content":"Post body","platform":["twitter","linkedin"],"scheduled_at":"2026-04-01T15:00:00Z"}</code>
+                </p>
+            </section>
+        </div>
+
+        <div class="save-bar">
+            <div class="message" id="save-message">Changes are stored in an encrypted local settings file inside <code>data/</code>.</div>
+            <div class="nav">
+                <button class="secondary" type="button" onclick="window.location.href='{{ app_base_path }}/'">Open Board</button>
+                <button class="primary" type="button" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const APP_BASE_PATH = {{ app_base_path | tojson }};
+
+        function providerCards() {
+            return Array.from(document.querySelectorAll('[data-provider]'));
+        }
+
+        function collectProvider(providerKey) {
+            const card = document.querySelector(`[data-provider="${providerKey}"]`);
+            const payload = {};
+            for (const input of card.querySelectorAll('input[data-field]')) {
+                payload[input.dataset.field] = input.value;
+            }
+            return payload;
+        }
+
+        function collectAllProviders() {
+            const providers = {};
+            for (const card of providerCards()) {
+                providers[card.dataset.provider] = collectProvider(card.dataset.provider);
+            }
+            return providers;
+        }
+
+        function setProviderResult(providerKey, kind, message) {
+            const el = document.getElementById(`result-${providerKey}`);
+            el.className = `provider-result ${kind}`;
+            el.textContent = message;
+        }
+
+        async function testProvider(providerKey) {
+            setProviderResult(providerKey, '', 'Testing connection…');
+            try {
+                const response = await fetch(`${APP_BASE_PATH}/api/settings/test/${providerKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ values: collectProvider(providerKey) }),
+                });
+                const data = await response.json();
+                if (!response.ok || data.configured === false) {
+                    setProviderResult(providerKey, 'error', data.error || data.message || 'Connection failed');
+                    return;
+                }
+                const summary = data.username || data.page_name || data.name || data.handle || data.cloud_name || data.email || 'Connection ok';
+                setProviderResult(providerKey, 'ok', `Connected: ${summary}`);
+            } catch (error) {
+                setProviderResult(providerKey, 'error', error.message || 'Connection failed');
+            }
+        }
+
+        async function saveSettings() {
+            const message = document.getElementById('save-message');
+            message.textContent = 'Saving settings…';
+            try {
+                const response = await fetch(`${APP_BASE_PATH}/api/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ providers: collectAllProviders() }),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    message.textContent = data.error || 'Failed to save settings';
+                    return;
+                }
+                message.textContent = 'Settings saved. The board now uses your updated credentials.';
+                for (const [providerKey, provider] of Object.entries(data.providers || {})) {
+                    const badge = document.getElementById(`status-${providerKey}`);
+                    if (!badge) continue;
+                    const ready = provider.configured;
+                    badge.textContent = ready
+                        ? `Configured${provider.source === 'settings' ? ' via UI' : provider.source === 'env' ? ' via env' : ''}`
+                        : 'Not configured';
+                    badge.className = `provider-status ${ready ? 'ready' : ''}`;
+                }
+            } catch (error) {
+                message.textContent = error.message || 'Failed to save settings';
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -978,8 +1699,6 @@ DASHBOARD_TEMPLATE = """
         }
         .btn-share.instagram { border-color: #E1306C; color: #E1306C; }
         .btn-share.instagram:hover { background: rgba(225, 48, 108, 0.1); }
-        .btn-share.bluesky { border-color: #0085ff; color: #0085ff; }
-        .btn-share.bluesky:hover { background: rgba(0, 133, 255, 0.1); }
         .btn-share.linkedin { border-color: #0A66C2; color: #0A66C2; }
         .btn-share.linkedin:hover { background: rgba(10, 102, 194, 0.1); }
         .btn-share.facebook { border-color: #1877F2; color: #1877F2; }
@@ -1959,7 +2678,6 @@ DASHBOARD_TEMPLATE = """
                         </button>
                         <div class="share-buttons">
                             <button class="btn-share instagram" onclick="openInstagram()">📷 Instagram</button>
-                            <button class="btn-share bluesky" onclick="postToBluesky()">🦋 Bluesky</button>
                             <button class="btn-share linkedin" onclick="openLinkedIn()">💼 LinkedIn</button>
                             <button class="btn-share facebook" onclick="postToFacebook()">📘 Facebook</button>
                         </div>
@@ -2978,11 +3696,6 @@ DASHBOARD_TEMPLATE = """
         }
     }
 
-    function postToBluesky() {
-        showToast('Bluesky integration coming soon! Download image for now.');
-        downloadImage();
-    }
-
     // Generate tweet image for a given content (returns canvas) - uses Brand theme
     async function generateTweetCanvas(content) {
         const canvas = document.createElement('canvas');
@@ -3958,6 +4671,13 @@ DASHBOARD_TEMPLATE = """
 @app.route('/')
 @login_required
 def dashboard():
+    if _needs_onboarding():
+        return render_template_string(
+            ONBOARDING_TEMPLATE,
+            app_base_path=APP_BASE_PATH,
+            providers=_render_provider_payload(),
+        )
+
     init_db()
     db_session = get_session()
 
@@ -3986,15 +4706,111 @@ def dashboard():
     }
 
     return render_template_string(
-        DASHBOARD_TEMPLATE,
+        _dashboard_template(),
         fresh_quotes=fresh_quotes,
         approved_posts=approved_posts,
         pending_posts=pending_posts,
         posted_posts=posted_posts,
         stats=stats,
         profile=PROFILE_CONFIG,
-        brand_config=_get_brand_config()
+        brand_config=_get_brand_config(),
+        app_base_path=APP_BASE_PATH,
     )
+
+
+@app.route('/settings')
+@login_required
+def settings():
+    return render_template_string(
+        SETTINGS_TEMPLATE,
+        app_base_path=APP_BASE_PATH,
+        providers=_render_provider_payload(),
+        onboarding=_needs_onboarding(),
+        agent_token=os.getenv('SOCIAL_KANBAN_AGENT_TOKEN', ''),
+    )
+
+
+@app.route('/api/settings', methods=['GET'])
+@login_required
+def get_settings():
+    return jsonify({
+        'success': True,
+        'providers': _render_provider_payload(),
+    })
+
+
+@app.route('/api/settings', methods=['POST'])
+@login_required
+def save_settings():
+    data = request.json or {}
+    SETTINGS_STORE.save({'providers': data.get('providers', {})})
+    return jsonify({
+        'success': True,
+        'providers': _render_provider_payload(),
+    })
+
+
+@app.route('/api/settings/test/<provider>', methods=['POST'])
+@login_required
+def test_settings_provider(provider: str):
+    if provider not in PROVIDER_DEFINITIONS:
+        return jsonify({'configured': False, 'error': 'Unknown provider'}), 404
+
+    data = request.json or {}
+    try:
+        result = _test_provider_connection(provider, data.get('values') or {})
+        return jsonify(result), 200 if result.get('configured') else 400
+    except Exception as e:
+        logger.error(f"Provider connection test failed for {provider}: {e}")
+        return jsonify({'configured': False, 'error': str(e)}), 400
+
+
+@app.route('/api/posts', methods=['POST'])
+@login_or_agent_required
+def create_posts():
+    init_db()
+    data = request.json or {}
+    content = data.get('content')
+    status = str(data.get('status', PostStatus.PENDING.value)).lower()
+    media_url = data.get('media_url')
+
+    if not isinstance(content, str) or not content.strip():
+        return jsonify({'error': 'content is required'}), 400
+    if status not in {PostStatus.PENDING.value, PostStatus.APPROVED.value, PostStatus.POSTED.value, PostStatus.REJECTED.value, PostStatus.FAILED.value}:
+        return jsonify({'error': 'Unsupported status'}), 400
+
+    try:
+        scheduled_at = _parse_scheduled_at(data.get('scheduled_at'))
+        platforms = _normalize_platforms(data.get('platform'))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    db_session = get_session()
+    created: list[dict[str, Any]] = []
+    for platform in platforms:
+        post = Post(
+            platform=platform,
+            content=content.strip(),
+            media_path=media_url if isinstance(media_url, str) and media_url.strip() else None,
+            scheduled_time=scheduled_at,
+            status=status,
+            created_at=datetime.now(timezone.utc),
+            approved_at=datetime.now(timezone.utc) if status == PostStatus.APPROVED.value else None,
+        )
+        db_session.add(post)
+        db_session.flush()
+        created.append({
+            'id': post.id,
+            'platform': platform,
+            'status': post.status,
+            'scheduled_at': post.scheduled_time.isoformat() if post.scheduled_time else None,
+        })
+
+    db_session.commit()
+    return jsonify({
+        'success': True,
+        'posts': created,
+    }), 201
 
 
 @app.route('/api/post/status', methods=['POST'])
@@ -4014,9 +4830,9 @@ def update_post_status():
 
     post.status = new_status
     if new_status == 'approved':
-        post.approved_at = datetime.now(UTC)
+        post.approved_at = datetime.now(timezone.utc)
     elif new_status == 'posted':
-        post.posted_time = datetime.now(UTC)
+        post.posted_time = datetime.now(timezone.utc)
 
     session.commit()
     return jsonify({'success': True})
@@ -4050,10 +4866,10 @@ def quote_to_post():
         platform="twitter",
         content=content,
         status=status,
-        created_at=datetime.now(UTC)
+        created_at=datetime.now(timezone.utc)
     )
     if status == 'approved':
-        post.approved_at = datetime.now(UTC)
+        post.approved_at = datetime.now(timezone.utc)
 
     quote.used_count += 1
     session.add(post)
@@ -4100,7 +4916,7 @@ def extract_quotes_from_upload():
 
     except ValueError as e:
         if 'GROQ_API_KEY' in str(e):
-            return jsonify({'error': 'API key not configured. Set GROQ_API_KEY environment variable.'}), 500
+            return jsonify({'error': 'Groq is not configured yet. Save your Groq key in Settings first.'}), 500
         return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': f'Extraction failed: {str(e)}'}), 500
@@ -4138,7 +4954,7 @@ def post_to_twitter():
         result = client.client.create_tweet(text=post.content)
 
         post.status = PostStatus.POSTED.value
-        post.posted_time = datetime.now(UTC)
+        post.posted_time = datetime.now(timezone.utc)
         post.post_id = str(result.data['id'])
         session.commit()
 
@@ -4402,14 +5218,16 @@ def post_to_social():
 @login_required
 def api_status():
     """Show which optional services are configured."""
+    provider_state = _render_provider_payload()
     services = {
         'database': 'postgresql' if os.getenv('DATABASE_URL') else 'sqlite',
-        'anthropic': bool(os.getenv('ANTHROPIC_API_KEY')),
-        'groq': bool(os.getenv('GROQ_API_KEY')),
-        'twitter': bool(os.getenv('TWITTER_API_KEY')),
-        'facebook': bool(os.getenv('FACEBOOK_PAGE_ID')),
-        'instagram': bool(os.getenv('INSTAGRAM_ACCOUNT_ID')),
-        'cloudinary': bool(os.getenv('CLOUDINARY_CLOUD_NAME')),
+        'anthropic': provider_state['anthropic']['configured'],
+        'groq': provider_state['groq']['configured'],
+        'twitter': provider_state['twitter']['configured'],
+        'facebook': provider_state['facebook']['configured'],
+        'instagram': provider_state['instagram']['configured'],
+        'linkedin': provider_state['linkedin']['configured'],
+        'cloudinary': provider_state['cloudinary']['configured'],
         'auth': bool(os.getenv('DASHBOARD_PASSWORD')),
     }
     return jsonify(services)
@@ -4714,7 +5532,7 @@ def generate_stoic_card():
 
     except ValueError as e:
         if 'GROQ_API_KEY' in str(e):
-            return jsonify({'error': 'API key not configured. Set GROQ_API_KEY.'}), 500
+            return jsonify({'error': 'Groq is not configured yet. Save your Groq key in Settings first.'}), 500
         return jsonify({'error': str(e)}), 500
     except Exception as e:
         logger.error(f"Stoic card generation failed: {e}")
@@ -4741,7 +5559,7 @@ def queue_stoic_card():
             media_path=image_url,  # Store Cloudinary URL
             platform='twitter',
             status=PostStatus.PENDING.value,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         db_session.add(post)
         db_session.commit()
@@ -4759,6 +5577,8 @@ def queue_stoic_card():
 
 def ensure_db_seeded():
     """Seed sample data if database is empty."""
+    if os.getenv('SOCIAL_KANBAN_SEED_SAMPLE_DATA', '').strip().lower() not in {'1', 'true', 'yes'}:
+        return
     init_db()
     session = get_session()
     if session.query(Quote).count() == 0:

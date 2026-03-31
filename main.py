@@ -19,7 +19,11 @@ from core.document_parser import parse_document
 from core.content_extractor import ContentExtractor
 from core.approval_system import ApprovalSystem
 from core.post_planner import PostPlanner
+from core.settings_store import SETTINGS_STORE, bootstrap_runtime_environment
 from integrations.twitter_client import TwitterClient
+
+bootstrap_runtime_environment()
+SETTINGS_STORE.apply_to_env()
 
 console = Console()
 
@@ -185,7 +189,7 @@ def post(post_id: int, post_next: bool, confirm: bool, dry: bool):
     client = TwitterClient(dry_run=dry)
 
     if not client.is_configured() and not dry:
-        console.print("[red]Twitter API not configured. Add credentials to .env file.[/red]")
+        console.print("[red]Twitter API not configured. Add credentials in the Settings page.[/red]")
         console.print("[dim]Or use --dry-run to test without posting[/dim]")
         return
 
@@ -232,11 +236,10 @@ def init():
     init_db()
     console.print("[green]✓ Database initialized[/green]")
 
-    env_path = Path(__file__).parent / '.env'
-    if env_path.exists():
-        console.print("[green]✓ .env file found[/green]")
+    if SETTINGS_STORE.has_any_credentials():
+        console.print("[green]✓ Settings UI credentials found[/green]")
     else:
-        console.print("[yellow]○ .env file not found - copy .env.example to .env[/yellow]")
+        console.print("[yellow]○ No saved platform credentials yet — open /settings after first boot[/yellow]")
 
     if os.getenv("ANTHROPIC_API_KEY"):
         console.print("[green]✓ Anthropic API key configured[/green]")

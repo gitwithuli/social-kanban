@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, Text, Enum, Index
 from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 import enum
 import os
 
@@ -9,7 +9,7 @@ Base = declarative_base()
 
 def utc_now():
     """Return current UTC time (timezone-aware)."""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 class PostStatus(enum.Enum):

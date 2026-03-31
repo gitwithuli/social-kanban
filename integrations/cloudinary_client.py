@@ -3,7 +3,7 @@ import os
 import hashlib
 import time
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 import requests
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ class CloudinaryClient:
         if exclude is None:
             exclude = ['profile_picture', 'profile']
 
-        cutoff_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
         deleted = []
         skipped = []
         errors = []
