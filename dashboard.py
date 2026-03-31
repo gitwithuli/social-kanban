@@ -3747,7 +3747,6 @@ DASHBOARD_TEMPLATE = """
         });
     })();
 
-    const showToast = (...args) => window.showToast(...args);
     const createPostCard = (...args) => window.createPostCard(...args);
     const syncBoardStats = (...args) => window.syncBoardStats(...args);
     const updateCardPresentation = (...args) => window.updateCardPresentation(...args);
@@ -3773,6 +3772,26 @@ DASHBOARD_TEMPLATE = """
         story: { width: 1080, height: 1920 },
         wide: { width: 1200, height: 675 }
     };
+
+    function stripBrandTagline(text) {
+        const tagline = String(BRAND_CONFIG.tagline || '').trim();
+        if (!tagline) return String(text || '');
+
+        let result = String(text || '');
+        const needle = tagline.toLowerCase();
+
+        while (true) {
+            const lower = result.toLowerCase();
+            const index = lower.indexOf(needle);
+            if (index === -1) break;
+
+            let end = index + tagline.length;
+            if (result[end] === '.') end += 1;
+            result = (result.slice(0, index) + result.slice(end)).trim();
+        }
+
+        return result;
+    }
 
     function openImageGenerator() {
         const content = document.getElementById('btn-generate-img').dataset.content;
@@ -3854,9 +3873,9 @@ DASHBOARD_TEMPLATE = """
         const lineHeight = fontSize * 1.5;
 
         // Strip hashtags and tagline from content (signature added separately)
-        const cleanContent = imgGenState.content
-            .replace(/#\w+/g, '')
-            .replace(new RegExp((BRAND_CONFIG.tagline || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.?', 'gi'), '')
+        const cleanContent = stripBrandTagline(
+            imgGenState.content.replace(/#\w+/g, '')
+        )
             .replace(/\s+/g, ' ')
             .trim();
 
@@ -4316,9 +4335,9 @@ DASHBOARD_TEMPLATE = """
         const lineHeight = fontSize * 1.5;
 
         // Strip hashtags and tagline from content (signature added separately)
-        const cleanContent = content
-            .replace(/#\w+/g, '')
-            .replace(new RegExp((BRAND_CONFIG.tagline || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.?', 'gi'), '')
+        const cleanContent = stripBrandTagline(
+            content.replace(/#\w+/g, '')
+        )
             .replace(/\s+/g, ' ')
             .trim();
 

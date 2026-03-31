@@ -111,6 +111,7 @@ def test_dashboard_uses_draft_review_columns(monkeypatch, tmp_path):
     assert b'id="newDraftButton"' in response.data
     assert b'grid-template-columns: repeat(3, minmax(0, 1fr));' in response.data
     assert b"newDraftButton.addEventListener('click', openDraftModal);" in response.data
+    assert b'const showToast = (...args) => window.showToast(...args);' not in response.data
     assert b'Pending Review' in response.data
     assert b'Scheduled' in response.data
     assert b'Fresh Quotes' not in response.data
