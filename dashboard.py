@@ -1604,7 +1604,7 @@ DASHBOARD_TEMPLATE = """
 
         .img-gen-content {
             display: grid;
-            grid-template-columns: 1fr 280px;
+            grid-template-columns: minmax(0, 1fr) 320px;
             gap: 1.5rem;
         }
 
@@ -1629,6 +1629,10 @@ DASHBOARD_TEMPLATE = """
             display: flex;
             flex-direction: column;
             gap: 1rem;
+            padding: 1rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
         }
 
         .control-group {
@@ -1647,13 +1651,14 @@ DASHBOARD_TEMPLATE = """
 
         .theme-options {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 0.5rem;
         }
 
         .theme-btn {
-            padding: 0.6rem;
-            border-radius: 8px;
+            min-height: 68px;
+            padding: 0.75rem 0.8rem;
+            border-radius: 12px;
             border: 2px solid var(--border);
             background: var(--bg-card);
             color: var(--text-primary);
@@ -1662,13 +1667,32 @@ DASHBOARD_TEMPLATE = """
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+            text-align: left;
         }
         .theme-btn:hover {
             border-color: var(--accent-cyan);
+            transform: translateY(-1px);
         }
         .theme-btn.active {
             border-color: var(--accent-cyan);
             background: rgba(0, 212, 255, 0.1);
+            box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.18);
+        }
+
+        .theme-btn-name {
+            font-size: 0.84rem;
+            font-weight: 600;
+            line-height: 1.1;
+        }
+
+        .theme-btn-tone {
+            font-size: 0.68rem;
+            line-height: 1.2;
+            opacity: 0.82;
         }
 
         .theme-btn.brand { background: #1a3a2f; color: #c9a227; }
@@ -1677,6 +1701,11 @@ DASHBOARD_TEMPLATE = """
         .theme-btn.dark { background: #0d1117; color: #e6edf3; }
         .theme-btn.edge { background: #FAF7F2; color: #C45A3B; border-color: #8B9A7D; }
         .theme-btn.stoic { background: #0f0f0f; color: #C45A3B; font-style: italic; }
+        .theme-btn.feather { background: #F7F3EC; color: #27313A; border-color: #D8CCBA; }
+        .theme-btn.dune { background: #F4E8DA; color: #6A4A2B; border-color: #D9C0A1; }
+        .theme-btn.rose { background: #F7EAE6; color: #6E4450; border-color: #D8B5BA; }
+        .theme-btn.tide { background: #EAF4F3; color: #1F5661; border-color: #B5D7D9; }
+        .theme-btn.citrus { background: #FFF6DE; color: #8B6200; border-color: #E9D18F; }
 
         .dimension-options {
             display: flex;
@@ -1704,17 +1733,17 @@ DASHBOARD_TEMPLATE = """
         .img-gen-actions {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.75rem;
             margin-top: auto;
             padding-top: 1rem;
         }
 
         .btn-download {
             width: 100%;
-            padding: 0.875rem;
+            padding: 0.95rem 1rem;
             background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
             border: none;
-            border-radius: 10px;
+            border-radius: 14px;
             color: white;
             font-family: 'Outfit', sans-serif;
             font-size: 0.95rem;
@@ -1725,6 +1754,7 @@ DASHBOARD_TEMPLATE = """
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.18);
         }
         .btn-download:hover {
             transform: translateY(-2px);
@@ -1732,16 +1762,17 @@ DASHBOARD_TEMPLATE = """
         }
 
         .share-buttons {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
         }
 
         .btn-share {
-            padding: 0.6rem;
-            border-radius: 8px;
+            width: 100%;
+            padding: 0.8rem 0.9rem;
+            border-radius: 12px;
             border: 1px solid var(--border);
-            background: var(--bg-card);
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
             color: var(--text-primary);
             font-family: 'Outfit', sans-serif;
             font-size: 0.8rem;
@@ -1750,12 +1781,49 @@ DASHBOARD_TEMPLATE = """
             transition: all 0.2s;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 0.4rem;
+            justify-content: flex-start;
+            gap: 0.75rem;
+            text-align: left;
         }
         .btn-share:hover {
             border-color: var(--text-secondary);
             background: var(--bg-elevated);
+            transform: translateY(-1px);
+        }
+        .btn-share:disabled {
+            opacity: 0.82;
+            cursor: wait;
+            transform: none;
+        }
+
+        .btn-share-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+            background: rgba(255,255,255,0.06);
+        }
+
+        .btn-share-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .btn-share-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            line-height: 1.1;
+        }
+
+        .btn-share-hint {
+            font-size: 0.68rem;
+            opacity: 0.78;
+            line-height: 1.2;
         }
         .btn-share.instagram { border-color: #E1306C; color: #E1306C; }
         .btn-share.instagram:hover { background: rgba(225, 48, 108, 0.1); }
@@ -2775,7 +2843,7 @@ DASHBOARD_TEMPLATE = """
                 max-height: 90vh;
             }
             .img-gen-content {
-                flex-direction: column;
+                grid-template-columns: 1fr;
             }
             .img-preview-container {
                 max-width: 100%;
@@ -2787,14 +2855,15 @@ DASHBOARD_TEMPLATE = """
             .img-gen-controls {
                 padding: 1rem;
             }
-            .theme-options, .dimension-options {
+            .theme-options {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .dimension-options {
                 flex-wrap: wrap;
             }
             .share-buttons {
-                flex-wrap: wrap;
-            }
-            .share-buttons button {
-                flex: 1 1 45%;
+                display: flex;
+                flex-direction: column;
             }
 
             .upload-panel {
@@ -3079,7 +3148,7 @@ DASHBOARD_TEMPLATE = """
     <div class="image-generator-modal" id="imageGenModal">
         <div class="img-gen-panel">
             <div class="img-gen-header">
-                <span class="img-gen-title">Generate Image for Socials</span>
+                <span class="img-gen-title">Create Social Image</span>
                 <button class="img-gen-close" onclick="closeImageGenerator()">&times;</button>
             </div>
             <div class="img-gen-content">
@@ -3090,12 +3159,15 @@ DASHBOARD_TEMPLATE = """
                     <div class="control-group">
                         <span class="control-label">Theme</span>
                         <div class="theme-options">
-                            <button class="theme-btn brand active" data-theme="brand" onclick="setTheme('brand')">Brand</button>
-                            <button class="theme-btn minimal" data-theme="minimal" onclick="setTheme('minimal')">Minimal</button>
-                            <button class="theme-btn bold" data-theme="bold" onclick="setTheme('bold')">Bold</button>
-                            <button class="theme-btn dark" data-theme="dark" onclick="setTheme('dark')">Dark</button>
-                            <button class="theme-btn edge" data-theme="edge" onclick="setTheme('edge')">Edge</button>
-                            <button class="theme-btn stoic" data-theme="stoic" onclick="setTheme('stoic')">Stoic</button>
+                            <button class="theme-btn feather active" data-theme="feather" onclick="setTheme('feather')"><span class="theme-btn-name">Feather</span><span class="theme-btn-tone">soft paper + slate</span></button>
+                            <button class="theme-btn brand" data-theme="brand" onclick="setTheme('brand')"><span class="theme-btn-name">Brand</span><span class="theme-btn-tone">ekuri green + gold</span></button>
+                            <button class="theme-btn minimal" data-theme="minimal" onclick="setTheme('minimal')"><span class="theme-btn-name">Minimal</span><span class="theme-btn-tone">clean mono layout</span></button>
+                            <button class="theme-btn tide" data-theme="tide" onclick="setTheme('tide')"><span class="theme-btn-name">Tide</span><span class="theme-btn-tone">mist teal + ink</span></button>
+                            <button class="theme-btn rose" data-theme="rose" onclick="setTheme('rose')"><span class="theme-btn-name">Rose</span><span class="theme-btn-tone">soft editorial pink</span></button>
+                            <button class="theme-btn citrus" data-theme="citrus" onclick="setTheme('citrus')"><span class="theme-btn-name">Citrus</span><span class="theme-btn-tone">warm citrus glow</span></button>
+                            <button class="theme-btn dune" data-theme="dune" onclick="setTheme('dune')"><span class="theme-btn-name">Dune</span><span class="theme-btn-tone">sandstone + bronze</span></button>
+                            <button class="theme-btn bold" data-theme="bold" onclick="setTheme('bold')"><span class="theme-btn-name">Bold</span><span class="theme-btn-tone">full-bleed dark</span></button>
+                            <button class="theme-btn dark" data-theme="dark" onclick="setTheme('dark')"><span class="theme-btn-name">Dark</span><span class="theme-btn-tone">graphite + white</span></button>
                         </div>
                     </div>
                     <div class="control-group">
@@ -3113,12 +3185,30 @@ DASHBOARD_TEMPLATE = """
                                 <polyline points="7 10 12 15 17 10"/>
                                 <line x1="12" y1="15" x2="12" y2="3"/>
                             </svg>
-                            Download PNG
+                            Download Cover PNG
                         </button>
                         <div class="share-buttons">
-                            <button class="btn-share instagram" onclick="openInstagram()">📷 Instagram</button>
-                            <button class="btn-share linkedin" onclick="openLinkedIn()">💼 LinkedIn</button>
-                            <button class="btn-share facebook" onclick="postToFacebook()">📘 Facebook</button>
+                            <button class="btn-share instagram" id="btn-img-instagram" data-default-label="Instagram Upload" data-default-hint="Download and send it to Instagram" onclick="openInstagram()">
+                                <span class="btn-share-icon">📷</span>
+                                <span class="btn-share-copy">
+                                    <span class="btn-share-label">Instagram Upload</span>
+                                    <span class="btn-share-hint">Download and send it to Instagram</span>
+                                </span>
+                            </button>
+                            <button class="btn-share linkedin" id="btn-img-linkedin" data-default-label="Post to LinkedIn" data-default-hint="Publish the image to your company page" onclick="openLinkedIn()">
+                                <span class="btn-share-icon">💼</span>
+                                <span class="btn-share-copy">
+                                    <span class="btn-share-label">Post to LinkedIn</span>
+                                    <span class="btn-share-hint">Publish the image to your company page</span>
+                                </span>
+                            </button>
+                            <button class="btn-share facebook" id="btn-img-facebook" data-default-label="Post to Facebook" data-default-hint="Upload the image to your Facebook page" onclick="postToFacebook()">
+                                <span class="btn-share-icon">📘</span>
+                                <span class="btn-share-copy">
+                                    <span class="btn-share-label">Post to Facebook</span>
+                                    <span class="btn-share-hint">Upload the image to your Facebook page</span>
+                                </span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3836,17 +3926,20 @@ DASHBOARD_TEMPLATE = """
     // Image Generator
     let imgGenState = {
         content: '',
-        theme: 'brand',
+        theme: 'feather',
         dimension: 'square'
     };
 
     const themes = {
         brand: { bg: '#1a3a2f', text: '#f5f0e6', secondary: '#a8b5a0', accent: '#c9a227', card: 'rgba(255,255,255,0.08)', style: 'card' },
+        feather: { bg: 'gradient-feather', text: '#27313A', secondary: '#7F8692', accent: '#B38A47', card: 'rgba(255,255,255,0.7)', style: 'centered', avatarStart: '#E2D5C2', avatarEnd: '#B8C6D5' },
         minimal: { bg: '#fafafa', text: '#1a1a1a', secondary: '#666666', accent: '#1a3a2f', card: '#ffffff', style: 'centered' },
+        tide: { bg: 'gradient-tide', text: '#16353A', secondary: '#58808B', accent: '#2A7B84', card: 'rgba(255,255,255,0.2)', style: 'card', avatarStart: '#A8D5D2', avatarEnd: '#5D8A92' },
+        rose: { bg: 'gradient-rose', text: '#5C3343', secondary: '#9B6B79', accent: '#C36F7F', card: 'rgba(255,255,255,0.74)', style: 'elegant', avatarStart: '#EFC1C6', avatarEnd: '#D88F9A' },
+        citrus: { bg: 'gradient-citrus', text: '#553D06', secondary: '#8E762B', accent: '#D38F00', card: 'rgba(255,255,255,0.72)', style: 'elegant', avatarStart: '#F7D66D', avatarEnd: '#F5A623' },
+        dune: { bg: 'gradient-dune', text: '#53331A', secondary: '#8D6E55', accent: '#B67A35', card: 'rgba(255,255,255,0.68)', style: 'card', avatarStart: '#E6C8A8', avatarEnd: '#C48B59' },
         bold: { bg: 'gradient-brand', text: '#f5f0e6', secondary: '#c9a227', accent: '#c9a227', card: 'none', style: 'fullbleed' },
         dark: { bg: '#0d1117', text: '#e6edf3', secondary: '#8b949e', accent: '#c9a227', card: 'rgba(255,255,255,0.06)', style: 'card' },
-        edge: { bg: '#FAF7F2', text: '#0F0F0F', secondary: '#8B9A7D', accent: '#C45A3B', card: '#ffffff', style: 'elegant' },
-        stoic: { bg: '#0f0f0f', text: '#e8e4df', secondary: '#6b6561', accent: '#C45A3B', card: 'rgba(255,255,255,0.04)', style: 'stoic' }
     };
 
     const dimensions = {
@@ -3917,6 +4010,36 @@ DASHBOARD_TEMPLATE = """
             gradient.addColorStop(0, '#1a3a2f');
             gradient.addColorStop(0.5, '#0d1f17');
             gradient.addColorStop(1, '#1a3a2f');
+            ctx.fillStyle = gradient;
+        } else if (theme.bg === 'gradient-feather') {
+            const gradient = ctx.createLinearGradient(0, 0, dim.width, dim.height);
+            gradient.addColorStop(0, '#f8f3ea');
+            gradient.addColorStop(0.55, '#efe7db');
+            gradient.addColorStop(1, '#dfe9f2');
+            ctx.fillStyle = gradient;
+        } else if (theme.bg === 'gradient-tide') {
+            const gradient = ctx.createLinearGradient(0, 0, dim.width, dim.height);
+            gradient.addColorStop(0, '#eef7f6');
+            gradient.addColorStop(0.55, '#d6ece9');
+            gradient.addColorStop(1, '#bddfe1');
+            ctx.fillStyle = gradient;
+        } else if (theme.bg === 'gradient-rose') {
+            const gradient = ctx.createLinearGradient(0, 0, dim.width, dim.height);
+            gradient.addColorStop(0, '#f9eeeb');
+            gradient.addColorStop(0.55, '#f3dde1');
+            gradient.addColorStop(1, '#ebc6d0');
+            ctx.fillStyle = gradient;
+        } else if (theme.bg === 'gradient-citrus') {
+            const gradient = ctx.createLinearGradient(0, 0, dim.width, dim.height);
+            gradient.addColorStop(0, '#fff8e5');
+            gradient.addColorStop(0.5, '#fff0bf');
+            gradient.addColorStop(1, '#ffe08e');
+            ctx.fillStyle = gradient;
+        } else if (theme.bg === 'gradient-dune') {
+            const gradient = ctx.createLinearGradient(0, 0, dim.width, dim.height);
+            gradient.addColorStop(0, '#f7ecdf');
+            gradient.addColorStop(0.5, '#ecd7c0');
+            gradient.addColorStop(1, '#ddb89a');
             ctx.fillStyle = gradient;
         } else {
             ctx.fillStyle = theme.bg;
@@ -4179,11 +4302,11 @@ DASHBOARD_TEMPLATE = """
             ctx.drawImage(profileImg, x, y, size, size);
         } else {
             const grad = ctx.createLinearGradient(x, y, x + size, y + size);
-            grad.addColorStop(0, '#1a3a2f');
-            grad.addColorStop(1, '#0d1f17');
+            grad.addColorStop(0, theme.avatarStart || theme.accent || '#1a3a2f');
+            grad.addColorStop(1, theme.avatarEnd || theme.secondary || '#0d1f17');
             ctx.fillStyle = grad;
             ctx.fillRect(x, y, size, size);
-            ctx.fillStyle = '#c9a227';
+            ctx.fillStyle = theme.text;
             ctx.font = `bold ${size * 0.5}px Outfit, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -4265,6 +4388,24 @@ DASHBOARD_TEMPLATE = """
         showToast('Image downloaded!');
     }
 
+    function setShareButtonState(button, label, hint) {
+        const labelNode = button.querySelector('.btn-share-label');
+        const hintNode = button.querySelector('.btn-share-hint');
+        if (labelNode) labelNode.textContent = label;
+        if (hintNode && hint !== undefined) hintNode.textContent = hint;
+    }
+
+    function resetShareButton(button) {
+        setShareButtonState(
+            button,
+            button.dataset.defaultLabel || '',
+            button.dataset.defaultHint || ''
+        );
+        button.disabled = false;
+        button.style.background = '';
+        button.style.color = '';
+    }
+
     function openInstagram() {
         downloadImage();
         setTimeout(() => {
@@ -4276,13 +4417,13 @@ DASHBOARD_TEMPLATE = """
     async function openLinkedIn() {
         const btn = document.querySelector('.btn-share.linkedin');
         btn.disabled = true;
-        btn.textContent = 'Generating...';
+        setShareButtonState(btn, 'Generating image...', 'Preparing the cover for LinkedIn');
 
         try {
             const canvas = await generateTweetCanvas(imgGenState.content);
             const imageData = canvas.toDataURL('image/png');
 
-            btn.textContent = 'Uploading...';
+            setShareButtonState(btn, 'Uploading image...', 'Sending the cover to Cloudinary');
 
             const uploadResp = await fetch('/api/cloudinary/upload', {
                 method: 'POST',
@@ -4295,7 +4436,7 @@ DASHBOARD_TEMPLATE = """
                 throw new Error(uploadData.error || 'Failed to upload image');
             }
 
-            btn.textContent = 'Posting...';
+            setShareButtonState(btn, 'Posting to LinkedIn...', 'Publishing to your company page');
 
             const resp = await fetch('/api/post/linkedin', {
                 method: 'POST',
@@ -4311,20 +4452,16 @@ DASHBOARD_TEMPLATE = """
                 throw new Error(data.error || 'Failed to post');
             }
 
-            btn.textContent = '✓ Posted!';
+            setShareButtonState(btn, 'Posted to LinkedIn', 'The image is live on your company page');
             btn.style.background = '#22c55e';
             btn.style.color = '#fff';
             showToast('Posted to LinkedIn with image!');
 
             setTimeout(() => {
-                btn.textContent = '💼 LinkedIn';
-                btn.style.background = '';
-                btn.style.color = '';
-                btn.disabled = false;
+                resetShareButton(btn);
             }, 3000);
         } catch (err) {
-            btn.textContent = '💼 LinkedIn';
-            btn.disabled = false;
+            resetShareButton(btn);
             showToast(err.message || 'Failed to post to LinkedIn', true);
         }
     }
@@ -4332,13 +4469,13 @@ DASHBOARD_TEMPLATE = """
     async function postToFacebook() {
         const btn = document.querySelector('.btn-share.facebook');
         btn.disabled = true;
-        btn.textContent = 'Generating...';
+        setShareButtonState(btn, 'Generating image...', 'Preparing the cover for Facebook');
 
         try {
             const canvas = await generateTweetCanvas(imgGenState.content);
             const imageData = canvas.toDataURL('image/png');
 
-            btn.textContent = 'Uploading...';
+            setShareButtonState(btn, 'Uploading image...', 'Sending the cover to Cloudinary');
 
             const uploadResp = await fetch('/api/cloudinary/upload', {
                 method: 'POST',
@@ -4351,7 +4488,7 @@ DASHBOARD_TEMPLATE = """
                 throw new Error(uploadData.error || 'Failed to upload image');
             }
 
-            btn.textContent = 'Posting...';
+            setShareButtonState(btn, 'Posting to Facebook...', 'Publishing to your page');
 
             const resp = await fetch('/api/post/facebook', {
                 method: 'POST',
@@ -4365,111 +4502,38 @@ DASHBOARD_TEMPLATE = """
             const data = await resp.json();
 
             if (resp.ok && data.success) {
-                btn.textContent = '✓ Posted!';
+                setShareButtonState(btn, 'Posted to Facebook', 'The image is live on your page');
                 btn.style.background = '#22c55e';
                 btn.style.color = '#fff';
                 showToast('Posted to Facebook with image!');
 
                 setTimeout(() => {
-                    btn.textContent = '📘 Facebook';
-                    btn.style.background = '';
-                    btn.style.color = '';
-                    btn.disabled = false;
+                    resetShareButton(btn);
                 }, 3000);
             } else {
                 throw new Error(data.error || 'Failed to post');
             }
         } catch (err) {
-            btn.textContent = '📘 Facebook';
-            btn.disabled = false;
+            resetShareButton(btn);
             showToast(err.message || 'Failed to post to Facebook', true);
         }
     }
 
-    // Generate tweet image for a given content (returns canvas) - uses Brand theme
+    // Clone the currently rendered social image so publish flows use the selected theme and size.
     async function generateTweetCanvas(content) {
+        const previousContent = imgGenState.content;
+        imgGenState.content = content;
+        await renderTweetImage();
+
+        const sourceCanvas = document.getElementById('tweetCanvas');
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        const dim = { width: 1080, height: 1080 };
-        const theme = { bg: '#1a3a2f', text: '#f5f0e6', secondary: '#a8b5a0', accent: '#c9a227', card: 'rgba(255,255,255,0.08)' };
-        const profileImg = profileImageLoaded ? await profileImageLoaded : null;
+        canvas.width = sourceCanvas.width;
+        canvas.height = sourceCanvas.height;
+        ctx.drawImage(sourceCanvas, 0, 0);
 
-        canvas.width = dim.width;
-        canvas.height = dim.height;
-
-        // Brand green background
-        ctx.fillStyle = theme.bg;
-        ctx.fillRect(0, 0, dim.width, dim.height);
-
-        // Subtle texture
-        ctx.globalAlpha = 0.03;
-        for (let i = 0; i < dim.width; i += 60) {
-            for (let j = 0; j < dim.height; j += 60) {
-                ctx.fillStyle = '#c9a227';
-                ctx.fillRect(i, j, 1, 1);
-            }
-        }
-        ctx.globalAlpha = 1;
-
-        const padding = dim.width * 0.06;
-        const contentWidth = dim.width - (padding * 2);
-        const fontSize = 36;
-        const lineHeight = fontSize * 1.5;
-
-        // Strip hashtags and tagline from content (signature added separately)
-        const cleanContent = stripBrandTagline(
-            content.replace(/#\w+/g, '')
-        )
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        // Calculate content height
-        ctx.font = `600 ${fontSize}px Outfit, sans-serif`;
-        const lines = wrapText(ctx, cleanContent, contentWidth - 80);
-        const textHeight = lines.length * lineHeight;
-
-        // Dynamic card - quote-only, positioned higher for link preview
-        const cardPadding = 50;
-        const signatureHeight = 50;
-        const cardHeight = textHeight + signatureHeight + cardPadding * 2 + 20;
-        const cardY = (dim.height - cardHeight) / 2 - 60;
-
-        // Card with glassmorphism
-        ctx.shadowColor = 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = 50;
-        ctx.shadowOffsetY = 15;
-        ctx.fillStyle = theme.card;
-        roundRect(ctx, padding, cardY, contentWidth, cardHeight, 24);
-        ctx.fill();
-        ctx.shadowColor = 'transparent';
-
-        // Gold accent line
-        ctx.fillStyle = theme.accent;
-        ctx.beginPath();
-        ctx.roundRect(padding, cardY, contentWidth, 4, [24, 24, 0, 0]);
-        ctx.fill();
-
-        // Quote text - centered
-        ctx.font = `600 ${fontSize}px Outfit, sans-serif`;
-        ctx.textAlign = 'center';
-        let y = cardY + cardPadding + 40;
-        lines.forEach(line => {
-            ctx.fillStyle = theme.text;
-            ctx.fillText(line, dim.width / 2, y);
-            y += lineHeight;
-        });
-
-        // Signature line - centered
-        ctx.fillStyle = theme.accent;
-        ctx.font = 'italic 600 26px Outfit, sans-serif';
-        ctx.fillText(BRAND_CONFIG.tagline || '', dim.width / 2, y + 30);
-
-        // Branding
-        ctx.fillStyle = theme.accent;
-        ctx.font = '600 18px JetBrains Mono, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(BRAND_CONFIG.domain || '', dim.width / 2, dim.height - padding);
-
+        imgGenState.content = previousContent;
+        await renderTweetImage();
         return canvas;
     }
 
