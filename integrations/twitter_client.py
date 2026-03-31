@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timezone
 from typing import Optional
-import json
 
 try:
     import tweepy
@@ -70,21 +69,28 @@ class TwitterClient:
 
     def verify_credentials(self) -> dict:
         if self.dry_run:
-            return {"status": "dry_run", "message": "Running in dry-run mode"}
+            return {"configured": True, "status": "dry_run", "message": "Running in dry-run mode"}
 
-        if not self.client:
-            return {"status": "error", "message": "Client not initialized"}
+        if not self.is_configured():
+            return {"configured": False, "error": "Twitter API credentials not fully configured"}
+        if not self.client or not self.api:
+            return {"configured": False, "error": "Client not initialized"}
 
         try:
-            me = self.client.get_me()
+            # OAuth1 verification matches the credential set we ask users to paste
+            # and avoids relying on a bearer token for connection tests.
+            me = self.api.verify_credentials(skip_status=True)
+            if me is None:
+                return {"configured": False, "error": "Twitter authentication failed"}
             return {
+                "configured": True,
                 "status": "ok",
-                "username": me.data.username,
-                "id": me.data.id,
-                "name": me.data.name
+                "username": getattr(me, "screen_name", None),
+                "id": getattr(me, "id", None),
+                "name": getattr(me, "name", None),
             }
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {"configured": False, "error": str(e)}
 
     def post_tweet(self, post: Post, confirm: bool = True) -> dict:
         if post.platform != "twitter":
