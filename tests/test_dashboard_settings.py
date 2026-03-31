@@ -73,6 +73,40 @@ def test_agent_hook_creates_posts_for_multiple_platforms(monkeypatch, tmp_path):
     payload = response.get_json()
     assert payload['success'] is True
     assert [post['platform'] for post in payload['posts']] == ['twitter', 'linkedin']
+    assert payload['posts'][0]['content'] == 'Ekuri can queue platform-specific drafts from the agent.'
+    assert payload['posts'][0]['scheduled_at'] == '2026-04-01T15:00:00+00:00'
+
+
+def test_post_update_route_returns_full_payload(monkeypatch, tmp_path):
+    dashboard = _load_dashboard(monkeypatch, tmp_path)
+    client = dashboard.app.test_client()
+
+    client.post('/api/settings', json={
+        'providers': {
+            'anthropic': {
+                'ANTHROPIC_API_KEY': 'sk-ant-test',
+            },
+        },
+    })
+
+    create_response = client.post('/api/posts', json={
+        'content': 'Initial draft copy',
+        'platform': ['twitter'],
+    })
+    post_id = create_response.get_json()['posts'][0]['id']
+
+    update_response = client.patch(f'/api/post/{post_id}', json={
+        'content': 'Updated draft copy',
+        'scheduled_at': '2026-04-01T18:30:00Z',
+        'media_url': 'https://example.com/image.png',
+    })
+
+    assert update_response.status_code == 200
+    payload = update_response.get_json()
+    assert payload['success'] is True
+    assert payload['post']['content'] == 'Updated draft copy'
+    assert payload['post']['media_url'] == 'https://example.com/image.png'
+    assert payload['post']['scheduled_at'] == '2026-04-01T18:30:00'
 
 
 def test_settings_route_works_under_application_root(monkeypatch, tmp_path):
@@ -112,6 +146,9 @@ def test_dashboard_uses_draft_review_columns(monkeypatch, tmp_path):
     assert b'grid-template-columns: repeat(3, minmax(0, 1fr));' in response.data
     assert b"newDraftButton.addEventListener('click', openDraftModal);" in response.data
     assert b'const showToast = (...args) => window.showToast(...args);' not in response.data
+    assert b'Edit Draft' in response.data
+    assert b'Reply' not in response.data
+    assert b'Repost' not in response.data
     assert b'Pending Review' in response.data
     assert b'Scheduled' in response.data
     assert b'Fresh Quotes' not in response.data

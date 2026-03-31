@@ -1360,28 +1360,51 @@ DASHBOARD_TEMPLATE = """
 
         .x-char-count { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
 
-        .x-actions {
+        .modal-draft-actions {
             display: flex;
-            justify-content: space-around;
+            justify-content: flex-start;
+            gap: 0.75rem;
+            flex-wrap: wrap;
             padding: 0.5rem 0;
             border-top: 1px solid var(--border);
         }
 
-        .x-action {
-            color: var(--text-muted);
-            display: flex;
+        .btn-draft-edit,
+        .btn-draft-delete {
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            cursor: pointer;
-            padding: 0.5rem 0.75rem;
+            justify-content: center;
+            gap: 0.45rem;
+            padding: 0.55rem 0.95rem;
             border-radius: 8px;
+            border: 1px solid var(--border-bright);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.2s;
+            background: transparent;
         }
 
-        .x-action:hover {
-            background: rgba(29, 155, 240, 0.1);
-            color: #1d9bf0;
+        .btn-draft-edit {
+            color: var(--text-primary);
+        }
+
+        .btn-draft-edit:hover {
+            background: rgba(88, 166, 255, 0.1);
+            border-color: rgba(88, 166, 255, 0.35);
+            color: var(--accent-cyan);
+        }
+
+        .btn-draft-delete {
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.28);
+        }
+
+        .btn-draft-delete:hover {
+            background: rgba(248, 113, 113, 0.1);
+            border-color: rgba(248, 113, 113, 0.42);
+            color: #fca5a5;
         }
 
         .modal-status {
@@ -2840,7 +2863,7 @@ DASHBOARD_TEMPLATE = """
             </div>
             <div class="column-body">
                 {% for post in pending_posts %}
-                <div class="card pending" data-type="post" data-id="{{ post.id }}" data-platform="{{ post.platform }}" data-platform-label="{{ platform_label(post.platform) }}" data-schedule-label="{{ post.scheduled_time.strftime('%b %d, %I:%M %p') if post.scheduled_time else '' }}" data-image-url="{{ post.media_path or '' }}" data-full-content='{{ post.content | tojson | safe }}'>
+                <div class="card pending" data-type="post" data-id="{{ post.id }}" data-platform="{{ post.platform }}" data-platform-label="{{ platform_label(post.platform) }}" data-scheduled-at="{{ post.scheduled_time.isoformat() if post.scheduled_time else '' }}" data-schedule-label="{{ post.scheduled_time.strftime('%b %d, %I:%M %p') if post.scheduled_time else '' }}" data-image-url="{{ post.media_path or '' }}" data-full-content='{{ post.content | tojson | safe }}'>
                     <div class="card-content">{{ post.content[:140] }}{% if post.content|length > 140 %}...{% endif %}</div>
                     <div class="card-meta post-meta">
                         <span><span class="status-dot pending"></span><span class="card-status-text">{{ platform_label(post.platform) }} • {{ post.scheduled_time.strftime('%b %d, %I:%M %p') if post.scheduled_time else 'Needs review' }}</span></span>
@@ -2863,7 +2886,7 @@ DASHBOARD_TEMPLATE = """
             </div>
             <div class="column-body">
                 {% for post in scheduled_posts %}
-                <div class="card approved" data-type="post" data-id="{{ post.id }}" data-platform="{{ post.platform }}" data-platform-label="{{ platform_label(post.platform) }}" data-schedule-label="{{ post.scheduled_time.strftime('%b %d, %I:%M %p') if post.scheduled_time else '' }}" data-image-url="{{ post.media_path or '' }}" data-full-content='{{ post.content | tojson | safe }}'>
+                <div class="card approved" data-type="post" data-id="{{ post.id }}" data-platform="{{ post.platform }}" data-platform-label="{{ platform_label(post.platform) }}" data-scheduled-at="{{ post.scheduled_time.isoformat() if post.scheduled_time else '' }}" data-schedule-label="{{ post.scheduled_time.strftime('%b %d, %I:%M %p') if post.scheduled_time else '' }}" data-image-url="{{ post.media_path or '' }}" data-full-content='{{ post.content | tojson | safe }}'>
                     <div class="card-content">{{ post.content[:140] }}{% if post.content|length > 140 %}...{% endif %}</div>
                     <div class="card-meta post-meta">
                         <span><span class="status-dot approved"></span><span class="card-status-text">{{ platform_label(post.platform) }} • {{ post.scheduled_time.strftime('%b %d, %I:%M %p') if post.scheduled_time else 'Ready to post' }}</span></span>
@@ -2886,7 +2909,7 @@ DASHBOARD_TEMPLATE = """
             </div>
             <div class="column-body">
                 {% for post in posted_posts %}
-                <div class="card posted" data-type="post" data-id="{{ post.id }}" data-platform="{{ post.platform }}" data-platform-label="{{ platform_label(post.platform) }}" data-posted-label="{{ post.posted_time.strftime('%b %d, %I:%M %p') if post.posted_time else '' }}" data-image-url="{{ post.media_path or '' }}" data-full-content='{{ post.content | tojson | safe }}'>
+                <div class="card posted" data-type="post" data-id="{{ post.id }}" data-platform="{{ post.platform }}" data-platform-label="{{ platform_label(post.platform) }}" data-scheduled-at="{{ post.scheduled_time.isoformat() if post.scheduled_time else '' }}" data-posted-label="{{ post.posted_time.strftime('%b %d, %I:%M %p') if post.posted_time else '' }}" data-image-url="{{ post.media_path or '' }}" data-full-content='{{ post.content | tojson | safe }}'>
                     <div class="card-content">{{ post.content[:100] }}{% if post.content|length > 100 %}...{% endif %}</div>
                     <div class="card-meta post-meta">
                         <span><span class="status-dot posted"></span><span class="card-status-text">{{ platform_label(post.platform) }} • {{ post.posted_time.strftime('%b %d, %I:%M %p') if post.posted_time else 'Done' }}</span></span>
@@ -3017,11 +3040,13 @@ DASHBOARD_TEMPLATE = """
                     <span id="modal-time"></span>
                     <span class="x-char-count" id="modal-chars"></span>
                 </div>
-                <div class="x-actions">
-                    <span class="x-action">💬 Reply</span>
-                    <span class="x-action">🔁 Repost</span>
-                    <span class="x-action">❤️ Like</span>
-                    <span class="x-action">📊 Views</span>
+                <div class="modal-draft-actions" id="modal-draft-actions" style="display:none;">
+                    <button class="btn-draft-edit" id="btn-edit-draft" onclick="openEditDraftFromModal()">
+                        Edit Draft
+                    </button>
+                    <button class="btn-draft-delete" id="btn-delete-draft" onclick="deleteDraftFromModal()">
+                        Remove Draft
+                    </button>
                 </div>
             </div>
             <div class="modal-status">
@@ -3370,6 +3395,71 @@ DASHBOARD_TEMPLATE = """
             return null;
         }
 
+        function formatPreviewContent(content) {
+            const escaped = escapeHtml(String(content || '')).replace(/\\n/g, '<br>');
+            return escaped.replace(/(^|[\s>])#([A-Za-z0-9_]+)/g, (match, prefix, tag) => (
+                `${prefix}<span class="x-hashtag">#${tag}</span>`
+            ));
+        }
+
+        function toDateTimeLocalValue(value) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '';
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        function buildPostCardMarkup(post) {
+            const status = post.status || 'pending';
+            const content = String(post.content || '');
+            const platform = post.platform || 'twitter';
+            const platformLabel = platformDisplayLabel(platform);
+            const scheduleLabel = formatScheduleLabel(post.scheduled_at || post.scheduled_time || '');
+            const imageUrl = post.media_url || post.media_path || '';
+            const truncated = content.length > 140 ? content.substring(0, 140) + '...' : content;
+            const charClass = content.length <= 250 ? 'char-ok' : content.length <= 280 ? 'char-warn' : 'char-over';
+            const attachment = imageUrl ? '<div class="attachment-chip">Image attached</div>' : '';
+
+            return {
+                status,
+                content,
+                platform,
+                platformLabel,
+                scheduleLabel,
+                scheduledAt: post.scheduled_at || post.scheduled_time || '',
+                postedLabel: post.posted_at || post.posted_time ? formatScheduleLabel(post.posted_at || post.posted_time) : '',
+                imageUrl,
+                html: `
+                    <div class="card-content">${escapeHtml(truncated)}</div>
+                    <div class="card-meta post-meta">
+                        <span><span class="status-dot ${status}"></span><span class="card-status-text">${escapeHtml(buildCardStatusText(platformLabel, status, scheduleLabel, ''))}</span></span>
+                        <span class="char-count ${charClass}">${content.length}/280</span>
+                    </div>
+                    ${attachment}
+                `,
+            };
+        }
+
+        function applyPostCardData(card, post) {
+            const cardData = buildPostCardMarkup(post);
+            card.className = 'card ' + cardData.status;
+            card.dataset.type = 'post';
+            card.dataset.id = post.id;
+            card.dataset.platform = cardData.platform;
+            card.dataset.platformLabel = cardData.platformLabel;
+            card.dataset.scheduledAt = cardData.scheduledAt;
+            card.dataset.scheduleLabel = cardData.scheduleLabel;
+            card.dataset.postedLabel = cardData.postedLabel;
+            card.dataset.imageUrl = cardData.imageUrl;
+            card.dataset.fullContent = JSON.stringify(cardData.content);
+            card.innerHTML = cardData.html;
+        }
+
         function openModal(card) {
             const type = card.dataset.type;
             const status = card.classList.contains('posted') ? 'posted' :
@@ -3379,6 +3469,7 @@ DASHBOARD_TEMPLATE = """
             const platform = card.dataset.platform || '';
             const platformLabel = card.dataset.platformLabel || platformDisplayLabel(platform);
             const scheduleLabel = card.dataset.scheduleLabel || '';
+            const scheduledAt = card.dataset.scheduledAt || '';
             const postedLabel = card.dataset.postedLabel || '';
 
             let content;
@@ -3394,9 +3485,9 @@ DASHBOARD_TEMPLATE = """
                 const quoteText = getFullContent(card) || card.querySelector('.card-content').textContent.replace(/^"|"$/g, '');
                 content = '"' + quoteText + '"\\n\\n' + (BRAND_CONFIG.tagline || '') + '\\n\\n' + (BRAND_CONFIG.hashtags || '');
             }
+            content = String(content || '');
 
-            // Format content with styled hashtags
-            let formattedContent = content.replace(/#(\\w+)/g, '<span class="x-hashtag">#$1</span>');
+            let formattedContent = formatPreviewContent(content);
 
             // If post has an image (stoic card), show it above the content
             if (imageUrl) {
@@ -3430,15 +3521,30 @@ DASHBOARD_TEMPLATE = """
             const igBtn = document.getElementById('btn-post-instagram');
             const fbBtn = document.getElementById('btn-post-facebook');
             const liBtn = document.getElementById('btn-post-linkedin');
+            const draftActions = document.getElementById('modal-draft-actions');
+            const editBtn = document.getElementById('btn-edit-draft');
+            const deleteBtn = document.getElementById('btn-delete-draft');
 
             postBtn.style.display = 'none';
             imgBtn.style.display = 'none';
             igBtn.style.display = 'none';
             fbBtn.style.display = 'none';
             liBtn.style.display = 'none';
+            draftActions.style.display = 'none';
+
+            editBtn.dataset.postId = card.dataset.id || '';
+            editBtn.dataset.platform = platform;
+            editBtn.dataset.platformLabel = platformLabel;
+            editBtn.dataset.content = content;
+            editBtn.dataset.scheduledAt = scheduledAt;
+            editBtn.dataset.imageUrl = imageUrl || '';
+            editBtn.dataset.status = status;
+            deleteBtn.dataset.postId = card.dataset.id || '';
+            deleteBtn.dataset.status = status;
 
             if (type === 'post' && status === 'approved') {
                 const wantsImageTools = ['instagram', 'facebook', 'linkedin'].includes(platform);
+                draftActions.style.display = 'flex';
                 if (platform === 'twitter') {
                     postBtn.style.display = 'block';
                     postBtn.dataset.postId = card.dataset.id || '';
@@ -3467,6 +3573,8 @@ DASHBOARD_TEMPLATE = """
                 imgBtn.dataset.content = content;
                 imgBtn.dataset.postId = card.dataset.id || '';
                 imgBtn.dataset.imageUrl = imageUrl || '';
+            } else if (type === 'post' && status === 'pending') {
+                draftActions.style.display = 'flex';
             } else {
                 postBtn.dataset.postId = '';
             }
@@ -3477,35 +3585,7 @@ DASHBOARD_TEMPLATE = """
         // Create a new post card element
         function createPostCard(post) {
             const card = document.createElement('div');
-            const status = post.status || 'pending';
-            const content = post.content || '';
-            const platform = post.platform || 'twitter';
-            const platformLabel = platformDisplayLabel(platform);
-            const scheduleLabel = formatScheduleLabel(post.scheduled_at);
-            card.className = 'card ' + status;
-            card.dataset.type = 'post';
-            card.dataset.id = post.id;
-            card.dataset.platform = platform;
-            card.dataset.platformLabel = platformLabel;
-            card.dataset.scheduleLabel = scheduleLabel;
-            card.dataset.postedLabel = '';
-            card.dataset.imageUrl = post.media_url || '';
-            card.dataset.fullContent = JSON.stringify(content);
-
-            const truncated = content.length > 140 ? content.substring(0, 140) + '...' : content;
-            const charClass = content.length <= 250 ? 'char-ok' : content.length <= 280 ? 'char-warn' : 'char-over';
-            const attachment = post.media_url
-                ? '<div class="attachment-chip">Image attached</div>'
-                : '';
-
-            card.innerHTML = `
-                <div class="card-content">${escapeHtml(truncated)}</div>
-                <div class="card-meta post-meta">
-                    <span><span class="status-dot ${status}"></span><span class="card-status-text">${escapeHtml(buildCardStatusText(platformLabel, status, scheduleLabel, ''))}</span></span>
-                    <span class="char-count ${charClass}">${content.length}/280</span>
-                </div>
-                ${attachment}
-            `;
+            applyPostCardData(card, post);
             return card;
         }
 
@@ -4717,9 +4797,13 @@ DASHBOARD_TEMPLATE = """
 
 
     let draftImageFile = null;
+    let draftEditPostId = null;
+    let draftEditPlatform = null;
 
     function resetDraftForm() {
         draftImageFile = null;
+        draftEditPostId = null;
+        draftEditPlatform = null;
         document.getElementById('draftContent').value = '';
         document.getElementById('draftSchedule').value = '';
         document.getElementById('draftImageUrl').value = '';
@@ -4727,6 +4811,7 @@ DASHBOARD_TEMPLATE = """
         document.getElementById('draftAttachmentPreview').classList.remove('show');
         document.getElementById('draftImageFile').value = '';
         document.querySelectorAll('input[name="draftPlatform"]').forEach((input, index) => {
+            input.disabled = false;
             input.checked = index === 0;
         });
     }
@@ -4734,10 +4819,63 @@ DASHBOARD_TEMPLATE = """
     function openDraftModal() {
         document.getElementById('draftModal').classList.add('show');
         resetDraftForm();
+        document.getElementById('draftSubmitBtn').textContent = 'Create Draft';
     }
 
     function closeDraftModal() {
         document.getElementById('draftModal').classList.remove('show');
+    }
+
+    function openEditDraftFromModal() {
+        const editBtn = document.getElementById('btn-edit-draft');
+        const postId = editBtn.dataset.postId;
+        if (!postId) {
+            window.showToast('Open a draft first', true);
+            return;
+        }
+
+        closeModal();
+        openDraftModal();
+        draftEditPostId = postId;
+        draftEditPlatform = editBtn.dataset.platform || 'twitter';
+        document.getElementById('draftContent').value = editBtn.dataset.content || '';
+        document.getElementById('draftSchedule').value = toDateTimeLocalValue(editBtn.dataset.scheduledAt || '');
+        document.getElementById('draftImageUrl').value = editBtn.dataset.imageUrl || '';
+        document.querySelectorAll('input[name="draftPlatform"]').forEach((input) => {
+            input.checked = input.value === draftEditPlatform;
+            input.disabled = true;
+        });
+        document.getElementById('draftSubmitBtn').textContent = 'Save Changes';
+    }
+
+    async function deleteDraftFromModal() {
+        const deleteBtn = document.getElementById('btn-delete-draft');
+        const postId = deleteBtn.dataset.postId;
+        if (!postId) {
+            window.showToast('Open a draft first', true);
+            return;
+        }
+        if (!window.confirm('Remove this draft?')) return;
+
+        deleteBtn.disabled = true;
+        try {
+            const resp = await fetch(`/api/post/${postId}`, {
+                method: 'DELETE',
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.error || 'Failed to remove draft');
+            }
+            const card = document.querySelector(`.card[data-id="${postId}"]`);
+            if (card) card.remove();
+            window.syncBoardStats();
+            closeModal();
+            window.showToast('Draft removed');
+        } catch (err) {
+            window.showToast(err.message || 'Failed to remove draft', true);
+        } finally {
+            deleteBtn.disabled = false;
+        }
     }
 
     function selectDraftImage() {
@@ -4807,52 +4945,76 @@ DASHBOARD_TEMPLATE = """
         }
 
         btn.disabled = true;
-        btn.textContent = draftImageFile ? 'Uploading image...' : 'Creating...';
+        btn.textContent = draftImageFile ? 'Uploading image...' : (draftEditPostId ? 'Saving...' : 'Creating...');
 
         try {
             const mediaUrl = await uploadDraftImageIfNeeded();
             if (draftImageFile) {
-                btn.textContent = 'Creating...';
+                btn.textContent = draftEditPostId ? 'Saving...' : 'Creating...';
             }
 
             const scheduledAt = scheduledValue ? new Date(scheduledValue).toISOString() : null;
-            const resp = await fetch('/api/posts', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    content,
-                    platform: selectedPlatforms,
-                    scheduled_at: scheduledAt,
-                    media_url: mediaUrl || null,
-                    status: 'pending',
-                })
-            });
-            const data = await resp.json();
-
-            if (!resp.ok || !data.success) {
-                throw new Error(data.error || 'Failed to create draft');
-            }
-
-            const pendingColumn = document.querySelector('.col-pending .column-body');
-            if (pendingColumn) {
-                [...data.posts].reverse().forEach((post) => {
-                    pendingColumn.prepend(createPostCard(post));
+            if (draftEditPostId) {
+                const resp = await fetch(`/api/post/${draftEditPostId}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        content,
+                        scheduled_at: scheduledAt,
+                        media_url: mediaUrl || null,
+                    })
                 });
+                const data = await resp.json();
+                if (!resp.ok || !data.success || !data.post) {
+                    throw new Error(data.error || 'Failed to update draft');
+                }
+                const card = document.querySelector(`.card[data-id="${draftEditPostId}"]`);
+                if (card) applyPostCardData(card, data.post);
+                window.syncBoardStats();
+                closeDraftModal();
+                window.showToast('Draft updated');
+            } else {
+                const resp = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        content,
+                        platform: selectedPlatforms,
+                        scheduled_at: scheduledAt,
+                        media_url: mediaUrl || null,
+                        status: 'pending',
+                    })
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to create draft');
+                }
+
+                const pendingColumn = document.querySelector('.col-pending .column-body');
+                if (pendingColumn) {
+                    [...data.posts].reverse().forEach((post) => {
+                        pendingColumn.prepend(window.createPostCard(post));
+                    });
+                }
+
+                const emptyState = pendingColumn?.querySelector('.empty-state');
+                if (emptyState) emptyState.remove();
+                const scheduledEmptyState = document.querySelector('.col-approved .empty-state');
+                const postedEmptyState = document.querySelector('.col-posted .empty-state');
+                if (scheduledEmptyState && document.querySelector('.col-approved .card')) scheduledEmptyState.remove();
+                if (postedEmptyState && document.querySelector('.col-posted .card')) postedEmptyState.remove();
+
+                window.syncBoardStats();
+                closeDraftModal();
+                window.showToast(`${data.posts.length} draft${data.posts.length === 1 ? '' : 's'} created`);
             }
-
-            const emptyState = pendingColumn?.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-            const scheduledEmptyState = document.querySelector('.col-approved .empty-state');
-            const postedEmptyState = document.querySelector('.col-posted .empty-state');
-            if (scheduledEmptyState && document.querySelector('.col-approved .card')) scheduledEmptyState.remove();
-            if (postedEmptyState && document.querySelector('.col-posted .card')) postedEmptyState.remove();
-
-            syncBoardStats();
-            closeDraftModal();
-            showToast(`${data.posts.length} draft${data.posts.length === 1 ? '' : 's'} created`);
         } catch (err) {
-            showToast(err.message || 'Failed to create draft', true);
+            window.showToast(err.message || 'Failed to create draft', true);
         } finally {
+            document.querySelectorAll('input[name="draftPlatform"]').forEach((input) => {
+                input.disabled = false;
+            });
             btn.disabled = false;
             btn.textContent = 'Create Draft';
         }
@@ -5541,6 +5703,8 @@ DASHBOARD_TEMPLATE = """
         postToFacebook,
         openDraftModal,
         closeDraftModal,
+        openEditDraftFromModal,
+        deleteDraftFromModal,
         selectDraftImage,
         removeDraftImage,
         submitDraft,
@@ -5746,18 +5910,62 @@ def create_posts():
         )
         db_session.add(post)
         db_session.flush()
-        created.append({
-            'id': post.id,
-            'platform': platform,
-            'status': post.status,
-            'scheduled_at': post.scheduled_time.isoformat() if post.scheduled_time else None,
-        })
+        created.append(_serialize_post(post))
 
     db_session.commit()
     return jsonify({
         'success': True,
         'posts': created,
     }), 201
+
+
+def _serialize_post(post: Post) -> dict[str, Any]:
+    return {
+        'id': post.id,
+        'platform': post.platform,
+        'status': post.status,
+        'content': post.content or '',
+        'media_url': post.media_path or '',
+        'scheduled_at': post.scheduled_time.isoformat() if post.scheduled_time else None,
+        'posted_at': post.posted_time.isoformat() if post.posted_time else None,
+    }
+
+
+@app.route('/api/post/<int:post_id>', methods=['PATCH', 'DELETE'])
+@login_required
+def mutate_post(post_id: int):
+    db_session = get_session()
+    post = db_session.query(Post).filter(Post.id == post_id).first()
+
+    if not post:
+        return jsonify({'error': 'Post not found'}), 404
+
+    if request.method == 'DELETE':
+        db_session.delete(post)
+        db_session.commit()
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    content = data.get('content')
+    if not isinstance(content, str) or not content.strip():
+        return jsonify({'error': 'content is required'}), 400
+
+    try:
+        scheduled_at = _parse_scheduled_at(data.get('scheduled_at'))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    media_url = data.get('media_url')
+
+    post.content = content.strip()
+    post.scheduled_time = scheduled_at
+    post.media_path = media_url.strip() if isinstance(media_url, str) and media_url.strip() else None
+    db_session.commit()
+
+    return jsonify({
+        'success': True,
+        'post': _serialize_post(post),
+    })
 
 
 @app.route('/api/post/status', methods=['POST'])
