@@ -83,3 +83,31 @@ def test_settings_route_works_under_application_root(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert b'Provider Settings' in response.data
+
+
+def test_dashboard_uses_draft_review_columns(monkeypatch, tmp_path):
+    dashboard = _load_dashboard(monkeypatch, tmp_path)
+    client = dashboard.app.test_client()
+
+    save_response = client.post('/api/settings', json={
+        'providers': {
+            'anthropic': {
+                'ANTHROPIC_API_KEY': 'sk-ant-test',
+            },
+        },
+    })
+    assert save_response.status_code == 200
+
+    create_response = client.post('/api/posts', json={
+        'content': 'Queue this for review before publishing.',
+        'platform': ['twitter'],
+    })
+    assert create_response.status_code == 201
+
+    response = client.get('/')
+
+    assert response.status_code == 200
+    assert b'New Draft' in response.data
+    assert b'Pending Review' in response.data
+    assert b'Scheduled' in response.data
+    assert b'Fresh Quotes' not in response.data
