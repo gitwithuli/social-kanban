@@ -150,7 +150,7 @@ def test_dashboard_uses_draft_review_columns(monkeypatch, tmp_path):
     assert b'Reply' not in response.data
     assert b'Repost' not in response.data
     assert b'Pending Review' in response.data
-    assert b'Scheduled' in response.data
+    assert b'Queued' in response.data
     assert b'Fresh Quotes' not in response.data
     assert b'Create Social Image' in response.data
     assert b'theme-btn feather active' in response.data

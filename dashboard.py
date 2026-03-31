@@ -2919,7 +2919,7 @@ DASHBOARD_TEMPLATE = """
                 </svg>
                 New Draft
             </button>
-            <div class="stat"><span class="stat-num" id="stat-scheduled">{{ stats.scheduled }}</span><span class="stat-label">scheduled</span></div>
+            <div class="stat"><span class="stat-num" id="stat-scheduled">{{ stats.scheduled }}</span><span class="stat-label">queued</span></div>
             <div class="stat"><span class="stat-num" id="stat-posted">{{ stats.posted }}</span><span class="stat-label">posted</span></div>
         </div>
     </div>
@@ -2950,7 +2950,7 @@ DASHBOARD_TEMPLATE = """
 
         <div class="column col-approved" data-status="approved">
             <div class="column-header">
-                <span class="column-title">Scheduled</span>
+                <span class="column-title">Queued</span>
                 <span class="column-count">{{ scheduled_posts|length }}</span>
             </div>
             <div class="column-body">
@@ -3396,10 +3396,17 @@ DASHBOARD_TEMPLATE = """
         function statusDisplayLabel(status) {
             return {
                 pending: 'Pending Review',
-                approved: 'Scheduled',
+                approved: 'Queued',
                 posted: 'Posted',
                 quote: 'Quote',
             }[status] || status;
+        }
+
+        function modalStatusLabel(status, scheduleLabel) {
+            if (status === 'approved') {
+                return scheduleLabel ? 'Scheduled' : 'Ready to post';
+            }
+            return statusDisplayLabel(status);
         }
 
         function buildCardStatusText(platformLabel, status, scheduleLabel, postedLabel) {
@@ -3590,7 +3597,7 @@ DASHBOARD_TEMPLATE = """
 
             const statusEl = document.getElementById('modal-status');
             statusEl.className = 'status-label ' + status;
-            statusEl.innerHTML = '<span class="status-dot ' + status + '"></span>' + statusDisplayLabel(status);
+            statusEl.innerHTML = '<span class="status-dot ' + status + '"></span>' + modalStatusLabel(status, scheduleLabel);
 
             const metaParts = [];
             if (platformLabel && type === 'post') metaParts.push(platformLabel);
