@@ -966,7 +966,7 @@ DASHBOARD_TEMPLATE = """
 
         .kanban {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 1rem;
             padding: 1.25rem;
             height: calc(100vh - 65px);
@@ -2821,7 +2821,7 @@ DASHBOARD_TEMPLATE = """
         <div class="logo">Social Kanban</div>
         <div class="stats-bar">
             <div class="stat"><span class="stat-num" id="stat-pending">{{ stats.pending }}</span><span class="stat-label">review</span></div>
-            <button class="btn-create" onclick="openDraftModal()">
+            <button class="btn-create" id="newDraftButton" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                     <path d="M12 5v14M5 12h14"/>
                 </svg>
@@ -3738,9 +3738,19 @@ DASHBOARD_TEMPLATE = """
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
         document.addEventListener('dragstart', e => e.preventDefault());
 
-        // Expose closeModal globally
-        window.closeModal = closeModal;
+        Object.assign(window, {
+            closeModal,
+            showToast,
+            createPostCard,
+            syncBoardStats,
+            updateCardPresentation,
+        });
     })();
+
+    const showToast = (...args) => window.showToast(...args);
+    const createPostCard = (...args) => window.createPostCard(...args);
+    const syncBoardStats = (...args) => window.syncBoardStats(...args);
+    const updateCardPresentation = (...args) => window.updateCardPresentation(...args);
 
     // Image Generator
     let imgGenState = {
@@ -5501,15 +5511,53 @@ DASHBOARD_TEMPLATE = """
         }, 150);
     }
 
+    Object.assign(window, {
+        openImageGenerator,
+        closeImageGenerator,
+        setTheme,
+        setDimension,
+        downloadImage,
+        openInstagram,
+        openLinkedIn,
+        postToFacebook,
+        openDraftModal,
+        closeDraftModal,
+        selectDraftImage,
+        removeDraftImage,
+        submitDraft,
+        openUploadModal,
+        closeUploadModal,
+        removeFile,
+        extractQuotes,
+        finishUpload,
+        openStoicModal,
+        closeStoicModal,
+        generateStoicCard,
+        downloadStoicImage,
+        postStoicToX,
+        postStoicToInstagram,
+        postStoicToFacebook,
+        queueStoicCard,
+        postToTwitterFromModal,
+        postToInstagramFromModal,
+        postToFacebookFromModal,
+        postToLinkedInFromModal,
+    });
+
     // File input and drag-drop handlers
     document.addEventListener('DOMContentLoaded', function() {
         // Apply source colors on load
         applySourceColors();
         syncBoardStats();
 
+        const newDraftButton = document.getElementById('newDraftButton');
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
         const draftImageInput = document.getElementById('draftImageFile');
+
+        if (newDraftButton) {
+            newDraftButton.addEventListener('click', openDraftModal);
+        }
 
         if (draftImageInput) {
             draftImageInput.addEventListener('change', handleDraftImageFile);
