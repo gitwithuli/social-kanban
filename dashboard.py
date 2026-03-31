@@ -1482,6 +1482,30 @@ DASHBOARD_TEMPLATE = """
             transform: none;
         }
 
+        .btn-post-linkedin {
+            display: inline-block;
+            background: #0A66C2;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-post-linkedin:hover {
+            background: #08549f;
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(10, 102, 194, 0.35);
+        }
+        .btn-post-linkedin:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .image-generator-modal {
             position: fixed;
             top: 0;
@@ -2449,7 +2473,7 @@ DASHBOARD_TEMPLATE = """
                 padding: 0.75rem;
             }
 
-            .btn-post-x, .btn-generate-img, .btn-post-instagram, .btn-post-facebook {
+            .btn-post-x, .btn-generate-img, .btn-post-instagram, .btn-post-facebook, .btn-post-linkedin {
                 padding: 0.75rem 1rem;
                 font-size: 0.9rem;
             }
@@ -2461,7 +2485,7 @@ DASHBOARD_TEMPLATE = """
                 padding: 1rem;
                 margin-bottom: 0.75rem;
             }
-            .btn-post-x, .btn-generate-img, .btn-post-instagram, .btn-post-facebook,
+            .btn-post-x, .btn-generate-img, .btn-post-instagram, .btn-post-facebook, .btn-post-linkedin,
             .btn-share, .theme-btn, .dim-btn {
                 min-height: 44px;
                 min-width: 44px;
@@ -2627,6 +2651,9 @@ DASHBOARD_TEMPLATE = """
                     </button>
                     <button class="btn-post-facebook" id="btn-post-facebook" onclick="postToFacebookFromModal()" style="display:none;">
                         📘 Facebook
+                    </button>
+                    <button class="btn-post-linkedin" id="btn-post-linkedin" onclick="postToLinkedInFromModal()" style="display:none;">
+                        💼 LinkedIn
                     </button>
                 </div>
                 <span id="modal-source" style="color: #71767b; font-size: 0.85rem;"></span>
@@ -2896,6 +2923,7 @@ DASHBOARD_TEMPLATE = """
             const imgBtn = document.getElementById('btn-generate-img');
             const igBtn = document.getElementById('btn-post-instagram');
             const fbBtn = document.getElementById('btn-post-facebook');
+            const liBtn = document.getElementById('btn-post-linkedin');
 
             if (type === 'post' || type === 'quote') {
                 const tweetUrl = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(content);
@@ -2905,6 +2933,7 @@ DASHBOARD_TEMPLATE = """
                 imgBtn.style.display = imageUrl ? 'none' : 'block';
                 igBtn.style.display = 'block';
                 fbBtn.style.display = 'block';
+                liBtn.style.display = 'block';
                 // Store content and image URL for posting functions
                 imgBtn.dataset.content = content;
                 igBtn.dataset.content = content;
@@ -2913,11 +2942,15 @@ DASHBOARD_TEMPLATE = """
                 fbBtn.dataset.content = content;
                 fbBtn.dataset.postId = card.dataset.id || '';
                 fbBtn.dataset.imageUrl = imageUrl || '';
+                liBtn.dataset.content = content;
+                liBtn.dataset.postId = card.dataset.id || '';
+                liBtn.dataset.imageUrl = imageUrl || '';
             } else {
                 postBtn.style.display = 'none';
                 imgBtn.style.display = 'none';
                 igBtn.style.display = 'none';
                 fbBtn.style.display = 'none';
+                liBtn.style.display = 'none';
             }
 
             document.getElementById('modal').classList.add('show');
@@ -3632,11 +3665,60 @@ DASHBOARD_TEMPLATE = """
         }, 500);
     }
 
-    function openLinkedIn() {
-        const text = imgGenState.content;
-        window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank');
-        showToast('Paste your content and upload the image on LinkedIn.');
-        downloadImage();
+    async function openLinkedIn() {
+        const btn = document.querySelector('.btn-share.linkedin');
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+
+        try {
+            const canvas = await generateTweetCanvas(imgGenState.content);
+            const imageData = canvas.toDataURL('image/png');
+
+            btn.textContent = 'Uploading...';
+
+            const uploadResp = await fetch('/api/cloudinary/upload', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: imageData})
+            });
+
+            const uploadData = await uploadResp.json();
+            if (!uploadResp.ok || !uploadData.secure_url) {
+                throw new Error(uploadData.error || 'Failed to upload image');
+            }
+
+            btn.textContent = 'Posting...';
+
+            const resp = await fetch('/api/post/linkedin', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    content: imgGenState.content,
+                    image_url: uploadData.secure_url
+                })
+            });
+
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.error || 'Failed to post');
+            }
+
+            btn.textContent = '✓ Posted!';
+            btn.style.background = '#22c55e';
+            btn.style.color = '#fff';
+            showToast('Posted to LinkedIn with image!');
+
+            setTimeout(() => {
+                btn.textContent = '💼 LinkedIn';
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.disabled = false;
+            }, 3000);
+        } catch (err) {
+            btn.textContent = '💼 LinkedIn';
+            btn.disabled = false;
+            showToast(err.message || 'Failed to post to LinkedIn', true);
+        }
     }
 
     async function postToFacebook() {
@@ -3787,6 +3869,7 @@ DASHBOARD_TEMPLATE = """
     async function postToInstagramFromModal() {
         const btn = document.getElementById('btn-post-instagram');
         const content = btn.dataset.content;
+        const postId = btn.dataset.postId;
         const existingImageUrl = btn.dataset.imageUrl;
 
         if (!content) {
@@ -3830,6 +3913,7 @@ DASHBOARD_TEMPLATE = """
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
+                    post_id: postId || null,
                     image_url: imageUrl,
                     caption: content
                 })
@@ -3861,6 +3945,7 @@ DASHBOARD_TEMPLATE = """
     async function postToFacebookFromModal() {
         const btn = document.getElementById('btn-post-facebook');
         const content = btn.dataset.content;
+        const postId = btn.dataset.postId;
         const existingImageUrl = btn.dataset.imageUrl;
 
         if (!content) {
@@ -3903,6 +3988,7 @@ DASHBOARD_TEMPLATE = """
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
+                    post_id: postId || null,
                     content: content,
                     image_url: imageUrl
                 })
@@ -3927,6 +4013,77 @@ DASHBOARD_TEMPLATE = """
             btn.textContent = '📘 Facebook';
             btn.disabled = false;
             showToast(err.message || 'Failed to post to Facebook', true);
+        }
+    }
+
+    async function postToLinkedInFromModal() {
+        const btn = document.getElementById('btn-post-linkedin');
+        const content = btn.dataset.content;
+        const postId = btn.dataset.postId;
+        const existingImageUrl = btn.dataset.imageUrl;
+
+        if (!content) {
+            showToast('No content to post', true);
+            return;
+        }
+
+        btn.disabled = true;
+
+        try {
+            let imageUrl = existingImageUrl || '';
+
+            if (!imageUrl) {
+                btn.textContent = 'Generating...';
+                const canvas = await generateTweetCanvas(content);
+                const imageData = canvas.toDataURL('image/png');
+
+                btn.textContent = 'Uploading...';
+
+                const uploadResp = await fetch('/api/cloudinary/upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image: imageData})
+                });
+                const uploadData = await uploadResp.json();
+
+                if (!uploadResp.ok || !uploadData.secure_url) {
+                    throw new Error(uploadData.error || 'Failed to upload image');
+                }
+
+                imageUrl = uploadData.secure_url;
+            }
+
+            btn.textContent = 'Posting...';
+
+            const resp = await fetch('/api/post/linkedin', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    post_id: postId || null,
+                    content: content,
+                    image_url: imageUrl
+                })
+            });
+
+            const data = await resp.json();
+
+            if (!resp.ok || !data.success) {
+                throw new Error(data.error || 'Failed to post');
+            }
+
+            btn.textContent = '✓ Posted!';
+            btn.style.background = '#22c55e';
+            showToast('Posted to LinkedIn!');
+
+            setTimeout(() => {
+                btn.textContent = '💼 LinkedIn';
+                btn.style.background = '';
+                btn.disabled = false;
+            }, 3000);
+        } catch (err) {
+            btn.textContent = '💼 LinkedIn';
+            btn.disabled = false;
+            showToast(err.message || 'Failed to post to LinkedIn', true);
         }
     }
 
@@ -4986,6 +5143,15 @@ def verify_twitter():
         return jsonify({'configured': False, 'error': str(e)})
 
 
+def _mark_post_published(post: Post | None, remote_post_id: str | None = None) -> None:
+    if not post:
+        return
+    post.status = PostStatus.POSTED.value
+    post.posted_time = datetime.now(timezone.utc)
+    if remote_post_id:
+        post.post_id = str(remote_post_id)
+
+
 @app.route('/api/post/facebook', methods=['POST'])
 @login_required
 def post_to_facebook():
@@ -5001,6 +5167,8 @@ def post_to_facebook():
     try:
         from integrations.facebook_client import FacebookClient
         client = FacebookClient()
+        session = None
+        post = None
 
         if not client.is_configured():
             return jsonify({'error': 'Facebook API not configured'}), 500
@@ -5011,11 +5179,16 @@ def post_to_facebook():
             if not post:
                 return jsonify({'error': 'Post not found'}), 404
             content = post.content
+            image_url = image_url or post.media_path
 
         if image_url:
             result = client.post_image(image_url, content)
         else:
             result = client.post_text(content)
+
+        _mark_post_published(post, result.get('post_id'))
+        if session:
+            session.commit()
 
         return jsonify({
             'success': True,
@@ -5046,20 +5219,38 @@ def verify_facebook():
 def post_to_instagram():
     """Post image to Instagram."""
     data = request.json
+    post_id = data.get('post_id')
     image_url = data.get('image_url')
     caption = data.get('caption', '')
 
-    if not image_url:
+    if not post_id and not image_url:
         return jsonify({'error': 'Missing image_url (must be publicly accessible)'}), 400
 
     try:
         from integrations.instagram_client import InstagramClient
         client = InstagramClient()
+        session = None
+        post = None
 
         if not client.is_configured():
             return jsonify({'error': 'Instagram API not configured'}), 500
 
+        if post_id:
+            session = get_session()
+            post = session.query(Post).filter(Post.id == post_id).first()
+            if not post:
+                return jsonify({'error': 'Post not found'}), 404
+            caption = caption or post.content
+            image_url = image_url or post.media_path
+
+        if not image_url:
+            return jsonify({'error': 'Missing image_url (must be publicly accessible)'}), 400
+
         result = client.post_image(image_url, caption)
+
+        _mark_post_published(post, result.get('post_id'))
+        if session:
+            session.commit()
 
         return jsonify({
             'success': True,
@@ -5083,6 +5274,55 @@ def verify_instagram():
 
     except Exception as e:
         return jsonify({'configured': False, 'error': str(e)})
+
+
+@app.route('/api/post/linkedin', methods=['POST'])
+@login_required
+def post_to_linkedin():
+    """Post content to LinkedIn, optionally with an image."""
+    data = request.json
+    post_id = data.get('post_id')
+    content = data.get('content')
+    image_url = data.get('image_url')
+
+    if not post_id and not content:
+        return jsonify({'error': 'Missing post_id or content'}), 400
+
+    try:
+        from integrations.linkedin_client import LinkedInClient
+        client = LinkedInClient()
+        session = None
+        post = None
+
+        if not client.is_configured():
+            return jsonify({'error': 'LinkedIn API not configured'}), 500
+
+        if post_id:
+            session = get_session()
+            post = session.query(Post).filter(Post.id == post_id).first()
+            if not post:
+                return jsonify({'error': 'Post not found'}), 404
+            content = content or post.content
+            image_url = image_url or post.media_path
+
+        if image_url:
+            result = client.post_image(image_url, content or '')
+        else:
+            result = client.post_text(content or '')
+
+        _mark_post_published(post, result.get('post_id'))
+        if session:
+            session.commit()
+
+        return jsonify({
+            'success': True,
+            'post_id': result.get('post_id'),
+            'url': result.get('url'),
+            'image_urn': result.get('image_urn'),
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to post: {str(e)}'}), 500
 
 
 @app.route('/api/cloudinary/upload', methods=['POST'])

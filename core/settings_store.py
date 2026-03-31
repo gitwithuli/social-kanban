@@ -60,10 +60,10 @@ PROVIDER_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
     'linkedin': {
         'label': 'LinkedIn',
-        'description': 'Store access for LinkedIn drafts and future publishing.',
+        'description': 'LinkedIn organization posting via the Posts API.',
         'fields': [
             {'name': 'LINKEDIN_ACCESS_TOKEN', 'label': 'Access Token', 'placeholder': 'linkedin access token', 'secret': True, 'required': True},
-            {'name': 'LINKEDIN_AUTHOR_URN', 'label': 'Author URN', 'placeholder': 'urn:li:person:... or urn:li:organization:...', 'secret': False, 'required': False},
+            {'name': 'LINKEDIN_AUTHOR_URN', 'label': 'Author URN', 'placeholder': 'urn:li:person:... or urn:li:organization:...', 'secret': False, 'required': True},
         ],
     },
     'cloudinary': {
